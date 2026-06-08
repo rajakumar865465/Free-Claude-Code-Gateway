@@ -1,0 +1,27 @@
+services:
+  fcc-gateway:
+    build: .
+    image: fcc-gateway:latest
+    container_name: fcc-gateway
+    ports:
+      - "8787:8787"
+    # Using env_file injects ALL variables (including secrets) into the container
+    # environment, making them visible via `docker inspect`. For production, supply
+    # secrets via Docker Secrets, a secrets manager (Vault, AWS SSM), or mount a
+    # read-only .env file that is NOT committed to the repository.
+    # For local development, env_file is fine.
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      # Persist request log, config overrides, and model registry between restarts
+      - fcc-gateway-data:/app/.blueclaude-data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  fcc-gateway-data:

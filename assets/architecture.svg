@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" width="900" height="420" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <!-- Background -->
+  <rect width="900" height="420" fill="#F6F8FC" rx="16"/>
+
+  <!-- Title -->
+  <text x="450" y="38" text-anchor="middle" font-size="17" font-weight="700" fill="#0F172A" letter-spacing="-0.3">Free Claude Code Gateway — Request Flow</text>
+  <text x="450" y="56" text-anchor="middle" font-size="12" fill="#64748B">One Endpoint. Any Provider. Claude Code Compatible.</text>
+
+  <!-- Client Box -->
+  <rect x="30" y="90" width="140" height="240" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <rect x="30" y="90" width="140" height="36" rx="12" fill="#2563EB"/>
+  <rect x="30" y="114" width="140" height="12" fill="#2563EB"/>
+  <text x="100" y="113" text-anchor="middle" font-size="12" font-weight="700" fill="#FFFFFF">Claude Code Clients</text>
+  <text x="100" y="148" text-anchor="middle" font-size="10.5" fill="#475569">Claude Code CLI</text>
+  <text x="100" y="166" text-anchor="middle" font-size="10.5" fill="#475569">VS Code / Cline</text>
+  <text x="100" y="184" text-anchor="middle" font-size="10.5" fill="#475569">Roo Code</text>
+  <text x="100" y="202" text-anchor="middle" font-size="10.5" fill="#475569">Continue.dev</text>
+  <text x="100" y="220" text-anchor="middle" font-size="10.5" fill="#475569">Aider</text>
+  <text x="100" y="238" text-anchor="middle" font-size="10.5" fill="#475569">Any Anthropic Client</text>
+  <text x="100" y="260" text-anchor="middle" font-size="9" fill="#94A3B8">POST /v1/messages</text>
+  <text x="100" y="276" text-anchor="middle" font-size="9" fill="#94A3B8">POST /v1/chat/completions</text>
+  <text x="100" y="292" text-anchor="middle" font-size="9" fill="#94A3B8">GET  /v1/models</text>
+  <text x="100" y="310" text-anchor="middle" font-size="9" fill="#94A3B8">GET  /health</text>
+
+  <!-- Arrow client -> gateway -->
+  <line x1="170" y1="210" x2="218" y2="210" stroke="#2563EB" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <text x="194" y="204" text-anchor="middle" font-size="9" fill="#2563EB" font-weight="600">Anthropic</text>
+  <text x="194" y="222" text-anchor="middle" font-size="9" fill="#2563EB" font-weight="600">Format</text>
+
+  <!-- Gateway Box -->
+  <rect x="220" y="74" width="300" height="272" rx="12" fill="#FFFFFF" stroke="#2563EB" stroke-width="2"/>
+  <rect x="220" y="74" width="300" height="36" rx="12" fill="url(#gradBlue)"/>
+  <rect x="220" y="98" width="300" height="12" fill="url(#gradBlue)"/>
+  <text x="370" y="97" text-anchor="middle" font-size="13" font-weight="700" fill="#FFFFFF">Free Claude Code Gateway</text>
+  <text x="370" y="112" text-anchor="middle" font-size="10" fill="#DBEAFE">localhost:8787 · TypeScript · Express</text>
+
+  <!-- Gateway internals -->
+  <rect x="238" y="124" width="126" height="26" rx="6" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1"/>
+  <text x="301" y="141" text-anchor="middle" font-size="10" fill="#1D4ED8" font-weight="600">Auth Middleware</text>
+
+  <rect x="374" y="124" width="126" height="26" rx="6" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1"/>
+  <text x="437" y="141" text-anchor="middle" font-size="10" fill="#1D4ED8" font-weight="600">Rate Limiter</text>
+
+  <rect x="238" y="160" width="262" height="28" rx="6" fill="#F0FDF4" stroke="#BBF7D0" stroke-width="1"/>
+  <text x="369" y="178" text-anchor="middle" font-size="10" fill="#15803D" font-weight="600">Request Validator &amp; Body Parser</text>
+
+  <rect x="238" y="198" width="262" height="28" rx="6" fill="#FFF7ED" stroke="#FED7AA" stroke-width="1"/>
+  <text x="369" y="216" text-anchor="middle" font-size="10" fill="#C2410C" font-weight="600">Model Router (Glob Pattern Matching)</text>
+
+  <rect x="238" y="236" width="262" height="28" rx="6" fill="#FAF5FF" stroke="#E9D5FF" stroke-width="1"/>
+  <text x="369" y="254" text-anchor="middle" font-size="10" fill="#7E22CE" font-weight="600">Anthropic ↔ OpenAI Format Converter</text>
+
+  <rect x="238" y="274" width="126" height="26" rx="6" fill="#F0F9FF" stroke="#BAE6FD" stroke-width="1"/>
+  <text x="301" y="291" text-anchor="middle" font-size="10" fill="#0369A1" font-weight="600">Stats Engine</text>
+
+  <rect x="374" y="274" width="126" height="26" rx="6" fill="#F0F9FF" stroke="#BAE6FD" stroke-width="1"/>
+  <text x="437" y="291" text-anchor="middle" font-size="10" fill="#0369A1" font-weight="600">Request Logger</text>
+
+  <text x="370" y="328" text-anchor="middle" font-size="9.5" fill="#64748B">Admin UI · /admin · Real-time Analytics</text>
+
+  <!-- Arrow gateway -> providers -->
+  <line x1="520" y1="210" x2="568" y2="210" stroke="#10B981" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <text x="544" y="204" text-anchor="middle" font-size="9" fill="#10B981" font-weight="600">OpenAI</text>
+  <text x="544" y="222" text-anchor="middle" font-size="9" fill="#10B981" font-weight="600">Format</text>
+
+  <!-- Providers Box -->
+  <rect x="570" y="90" width="300" height="240" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <rect x="570" y="90" width="300" height="36" rx="12" fill="url(#gradGreen)"/>
+  <rect x="570" y="114" width="300" height="12" fill="url(#gradGreen)"/>
+  <text x="720" y="113" text-anchor="middle" font-size="12" font-weight="700" fill="#FFFFFF">OpenAI-Compatible Providers</text>
+
+  <!-- Provider rows -->
+  <rect x="588" y="132" width="125" height="24" rx="5" fill="#F0FDF4" stroke="#BBF7D0"/>
+  <text x="650.5" y="148" text-anchor="middle" font-size="10" fill="#15803D" font-weight="600">🌙  Kimi / MoonShot</text>
+
+  <rect x="725" y="132" width="125" height="24" rx="5" fill="#F0FDF4" stroke="#BBF7D0"/>
+  <text x="787.5" y="148" text-anchor="middle" font-size="10" fill="#15803D" font-weight="600">⚡  GLM / Z.ai</text>
+
+  <rect x="588" y="164" width="125" height="24" rx="5" fill="#EFF6FF" stroke="#BFDBFE"/>
+  <text x="650.5" y="180" text-anchor="middle" font-size="10" fill="#1D4ED8" font-weight="600">🔵  DeepSeek</text>
+
+  <rect x="725" y="164" width="125" height="24" rx="5" fill="#EFF6FF" stroke="#BFDBFE"/>
+  <text x="787.5" y="180" text-anchor="middle" font-size="10" fill="#1D4ED8" font-weight="600">🔀  OpenRouter</text>
+
+  <rect x="588" y="196" width="125" height="24" rx="5" fill="#FAF5FF" stroke="#E9D5FF"/>
+  <text x="650.5" y="212" text-anchor="middle" font-size="10" fill="#7E22CE" font-weight="600">🤖  Mistral</text>
+
+  <rect x="725" y="196" width="125" height="24" rx="5" fill="#FAF5FF" stroke="#E9D5FF"/>
+  <text x="787.5" y="212" text-anchor="middle" font-size="10" fill="#7E22CE" font-weight="600">🦙  Ollama (Local)</text>
+
+  <rect x="588" y="228" width="125" height="24" rx="5" fill="#FFF7ED" stroke="#FED7AA"/>
+  <text x="650.5" y="244" text-anchor="middle" font-size="10" fill="#C2410C" font-weight="600">✨  Fireworks AI</text>
+
+  <rect x="725" y="228" width="125" height="24" rx="5" fill="#FFF7ED" stroke="#FED7AA"/>
+  <text x="787.5" y="244" text-anchor="middle" font-size="10" fill="#C2410C" font-weight="600">🏠  LM Studio</text>
+
+  <rect x="588" y="260" width="262" height="24" rx="5" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="719" y="276" text-anchor="middle" font-size="10" fill="#64748B" font-weight="600">Any OpenAI-Compatible Endpoint</text>
+
+  <text x="720" y="310" text-anchor="middle" font-size="9.5" fill="#94A3B8">Point BLUESMINDS_BASE_URL at any provider</text>
+
+  <!-- Bottom note -->
+  <text x="450" y="385" text-anchor="middle" font-size="11" fill="#64748B">Responses are converted back to Anthropic format before returning to the client — fully transparent</text>
+
+  <!-- Defs -->
+  <defs>
+    <linearGradient id="gradBlue" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1D4ED8"/>
+      <stop offset="100%" style="stop-color:#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="gradGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#059669"/>
+      <stop offset="100%" style="stop-color:#0284C7"/>
+    </linearGradient>
+    <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#2563EB"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#10B981"/>
+    </marker>
+  </defs>
+</svg>

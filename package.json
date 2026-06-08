@@ -1,0 +1,47 @@
+{
+  "name": "fcc-gateway",
+  "version": "1.0.0",
+  "description": "Universal Claude-Compatible AI Gateway for Claude Code with model routing, provider failover, analytics and multi-provider support.",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "node --test --import tsx tests/config.test.ts tests/converter.test.ts tests/errors.test.ts tests/messages.test.ts tests/models.test.ts tests/redact.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "claude-code",
+    "claude-code-gateway",
+    "claude-compatible",
+    "claude-compatible-api",
+    "claude-compatible-proxy",
+    "claude-api-gateway",
+    "claude-code-proxy",
+    "ai-gateway",
+    "model-router",
+    "kimi",
+    "glm",
+    "deepseek",
+    "openai-compatible"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "pino": "^9.4.0",
+    "pino-pretty": "^11.2.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.16.5",
+    "tsx": "^4.19.1",
+    "typescript": "^5.5.4"
+  }
+}

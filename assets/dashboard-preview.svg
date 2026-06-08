@@ -1,0 +1,224 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" width="900" height="520" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="sidebarGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF"/>
+      <stop offset="100%" style="stop-color:#F8FAFC"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Window chrome -->
+  <rect width="900" height="520" fill="#E2E8F0" rx="12"/>
+  <rect x="0" y="0" width="900" height="36" fill="#1E293B" rx="12"/>
+  <rect x="0" y="24" width="900" height="12" fill="#1E293B"/>
+  <circle cx="20" cy="18" r="6" fill="#EF4444"/>
+  <circle cx="40" cy="18" r="6" fill="#F59E0B"/>
+  <circle cx="60" cy="18" r="6" fill="#10B981"/>
+  <text x="450" y="23" text-anchor="middle" font-size="11" fill="#94A3B8">localhost:8787/admin — Free Claude Code Gateway</text>
+
+  <!-- App layout -->
+  <rect x="0" y="36" width="900" height="484" fill="#F6F8FC"/>
+
+  <!-- Sidebar -->
+  <rect x="0" y="36" width="200" height="484" fill="url(#sidebarGrad)" stroke="#E2E8F0" stroke-width="1"/>
+
+  <!-- Brand -->
+  <rect x="14" y="52" width="32" height="32" rx="8" fill="#2563EB"/>
+  <text x="30" y="72" text-anchor="middle" font-size="14" fill="white">⬡</text>
+  <text x="54" y="66" font-size="12" font-weight="700" fill="#0F172A">FCC Gateway</text>
+  <text x="54" y="80" font-size="9.5" fill="#94A3B8">Universal Claude AI Gateway</text>
+  <rect x="156" y="54" width="32" height="16" rx="8" fill="#F1F5F9"/>
+  <text x="172" y="65" text-anchor="middle" font-size="8.5" fill="#64748B" font-weight="600">v1.0.0</text>
+
+  <!-- Nav items -->
+  <text x="14" y="110" font-size="8.5" fill="#94A3B8" font-weight="700" letter-spacing="0.5">MAIN</text>
+
+  <rect x="8" y="116" width="184" height="30" rx="6" fill="#EFF6FF"/>
+  <rect x="8" y="116" width="3" height="30" rx="1.5" fill="#2563EB"/>
+  <text x="30" y="136" font-size="12" fill="#2563EB">▦</text>
+  <text x="48" y="136" font-size="11.5" fill="#2563EB" font-weight="600">Overview</text>
+
+  <rect x="8" y="152" width="184" height="28" rx="6" fill="none"/>
+  <text x="30" y="170" font-size="11" fill="#64748B">≋</text>
+  <text x="48" y="170" font-size="11.5" fill="#64748B">Live Requests</text>
+
+  <rect x="8" y="184" width="184" height="28" rx="6" fill="none"/>
+  <text x="30" y="202" font-size="11" fill="#64748B">▷</text>
+  <text x="48" y="202" font-size="11.5" fill="#64748B">Playground</text>
+
+  <text x="14" y="228" font-size="8.5" fill="#94A3B8" font-weight="700" letter-spacing="0.5">MANAGEMENT</text>
+
+  <rect x="8" y="234" width="184" height="28" rx="6" fill="none"/>
+  <text x="30" y="252" font-size="11" fill="#64748B">◉</text>
+  <text x="48" y="252" font-size="11.5" fill="#64748B">Providers</text>
+
+  <rect x="8" y="266" width="184" height="28" rx="6" fill="none"/>
+  <text x="30" y="284" font-size="11" fill="#64748B">⬡</text>
+  <text x="48" y="284" font-size="11.5" fill="#64748B">Model Router</text>
+
+  <text x="14" y="314" font-size="8.5" fill="#94A3B8" font-weight="700" letter-spacing="0.5">SYSTEM</text>
+
+  <rect x="8" y="320" width="184" height="28" rx="6" fill="none"/>
+  <text x="30" y="338" font-size="11" fill="#64748B">⚙</text>
+  <text x="48" y="338" font-size="11.5" fill="#64748B">Settings</text>
+
+  <rect x="8" y="352" width="184" height="28" rx="6" fill="none"/>
+  <text x="30" y="370" font-size="11" fill="#64748B">⊕</text>
+  <text x="48" y="370" font-size="11.5" fill="#64748B">Diagnostics</text>
+
+  <!-- Gateway live pill -->
+  <rect x="12" y="488" width="176" height="24" rx="6" fill="#F0FDF4" stroke="#BBF7D0"/>
+  <circle cx="26" cy="500" r="4" fill="#10B981"/>
+  <text x="36" y="504" font-size="11" fill="#15803D" font-weight="600">Gateway Live</text>
+
+  <!-- Topbar -->
+  <rect x="200" y="36" width="700" height="52" fill="rgba(255,255,255,0.9)" stroke="#E2E8F0" stroke-width="1"/>
+  <text x="220" y="60" font-size="16" font-weight="700" fill="#0F172A">Overview</text>
+  <text x="220" y="76" font-size="11" fill="#94A3B8">Monitor requests, routing, provider health and usage analytics.</text>
+
+  <!-- Search bar -->
+  <rect x="540" y="47" width="180" height="28" rx="6" fill="#F1F5F9" stroke="#E2E8F0"/>
+  <text x="556" y="65" font-size="11" fill="#94A3B8">Search… </text>
+  <rect x="726" y="50" width="36" height="22" rx="5" fill="#E2E8F0"/>
+  <text x="744" y="65" text-anchor="middle" font-size="9" fill="#64748B">⌘K</text>
+  <rect x="770" y="47" width="50" height="28" rx="6" fill="#DCFCE7" stroke="#BBF7D0"/>
+  <text x="795" y="65" text-anchor="middle" font-size="10" fill="#15803D" font-weight="600">● Live</text>
+  <rect x="828" y="47" width="62" height="28" rx="6" fill="#EFF6FF" stroke="#BFDBFE"/>
+  <text x="859" y="65" text-anchor="middle" font-size="10" fill="#1D4ED8" font-weight="600">Copy URL</text>
+
+  <!-- Status bar -->
+  <rect x="208" y="98" width="684" height="38" rx="8" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <rect x="208" y="98" width="684" height="3" rx="1.5" fill="url(#statusLine)"/>
+  <defs>
+    <linearGradient id="statusLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2563EB"/>
+      <stop offset="50%" style="stop-color:#7C3AED"/>
+      <stop offset="100%" style="stop-color:#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <rect x="220" y="109" width="64" height="18" rx="9" fill="#DCFCE7" stroke="#BBF7D0"/>
+  <circle cx="231" cy="118" r="3" fill="#10B981"/>
+  <text x="253" y="123" text-anchor="middle" font-size="9" fill="#15803D" font-weight="700">Gateway Live</text>
+  <text x="310" y="123" font-size="9" fill="#94A3B8">|</text>
+  <text x="320" y="118" font-size="9" fill="#64748B">Provider</text>
+  <text x="356" y="118" font-size="9" fill="#0F172A" font-weight="600">api.bluesminds.com</text>
+  <text x="478" y="123" font-size="9" fill="#94A3B8">|</text>
+  <text x="488" y="118" font-size="9" fill="#64748B">Default Model</text>
+  <text x="546" y="118" font-size="9" fill="#0F172A" font-weight="700" font-family="monospace">z-ai/glm-5.1</text>
+  <text x="628" y="123" font-size="9" fill="#94A3B8">|</text>
+  <text x="638" y="118" font-size="9" fill="#64748B">Endpoints</text>
+  <text x="685" y="118" font-size="9" fill="#0F172A" font-weight="600">Claude &amp; OpenAI</text>
+  <rect x="790" y="108" width="92" height="20" rx="5" fill="#EFF6FF" stroke="#BFDBFE"/>
+  <text x="836" y="122" text-anchor="middle" font-size="9.5" fill="#1D4ED8" font-weight="600">Run Diagnostic</text>
+
+  <!-- KPI Grid -->
+  <rect x="208" y="146" width="162" height="80" rx="8" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <rect x="208" y="146" width="162" height="3" rx="1" fill="#2563EB"/>
+  <text x="222" y="162" font-size="9" fill="#64748B" font-weight="600" letter-spacing="0.4">TOTAL REQUESTS</text>
+  <text x="222" y="196" font-size="28" font-weight="700" fill="#0F172A">1,247</text>
+  <text x="222" y="216" font-size="10" fill="#10B981" font-weight="600">Receiving traffic</text>
+
+  <rect x="378" y="146" width="162" height="80" rx="8" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <rect x="378" y="146" width="162" height="3" rx="1" fill="#10B981"/>
+  <text x="392" y="162" font-size="9" fill="#64748B" font-weight="600" letter-spacing="0.4">SUCCESS RATE</text>
+  <text x="392" y="196" font-size="28" font-weight="700" fill="#15803D">98.4%</text>
+  <text x="392" y="216" font-size="10" fill="#10B981" font-weight="600">Healthy</text>
+
+  <rect x="548" y="146" width="162" height="80" rx="8" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <rect x="548" y="146" width="162" height="3" rx="1" fill="#F59E0B"/>
+  <text x="562" y="162" font-size="9" fill="#64748B" font-weight="600" letter-spacing="0.4">MEDIAN LATENCY</text>
+  <text x="562" y="196" font-size="28" font-weight="700" fill="#0F172A">342ms</text>
+  <text x="562" y="216" font-size="10" fill="#64748B" font-weight="600">Acceptable</text>
+
+  <rect x="718" y="146" width="174" height="80" rx="8" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <rect x="718" y="146" width="174" height="3" rx="1" fill="#7C3AED"/>
+  <text x="732" y="162" font-size="9" fill="#64748B" font-weight="600" letter-spacing="0.4">TOTAL TOKENS</text>
+  <text x="732" y="196" font-size="28" font-weight="700" fill="#0F172A">2.4M</text>
+  <text x="732" y="216" font-size="10" fill="#64748B" font-weight="600">In + Out combined</text>
+
+  <!-- Chart panel -->
+  <rect x="208" y="238" width="440" height="136" rx="8" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="222" y="256" font-size="12" font-weight="600" fill="#0F172A">Requests Over Time</text>
+  <text x="222" y="270" font-size="10" fill="#94A3B8">Rolling 60-second window</text>
+  <!-- fake chart bars -->
+  <rect x="226" y="322" width="14" height="30" rx="2" fill="#BFDBFE"/>
+  <rect x="246" y="310" width="14" height="42" rx="2" fill="#93C5FD"/>
+  <rect x="266" y="300" width="14" height="52" rx="2" fill="#60A5FA"/>
+  <rect x="286" y="318" width="14" height="34" rx="2" fill="#3B82F6"/>
+  <rect x="306" y="305" width="14" height="47" rx="2" fill="#2563EB"/>
+  <rect x="326" y="295" width="14" height="57" rx="2" fill="#2563EB"/>
+  <rect x="346" y="308" width="14" height="44" rx="2" fill="#60A5FA"/>
+  <rect x="366" y="315" width="14" height="37" rx="2" fill="#93C5FD"/>
+  <rect x="386" y="298" width="14" height="54" rx="2" fill="#2563EB"/>
+  <rect x="406" y="288" width="14" height="64" rx="2" fill="#1D4ED8"/>
+  <rect x="426" y="302" width="14" height="50" rx="2" fill="#3B82F6"/>
+  <rect x="446" y="312" width="14" height="40" rx="2" fill="#60A5FA"/>
+  <rect x="466" y="296" width="14" height="56" rx="2" fill="#2563EB"/>
+  <rect x="486" y="285" width="14" height="67" rx="2" fill="#1D4ED8"/>
+  <rect x="506" y="294" width="14" height="58" rx="2" fill="#2563EB"/>
+  <rect x="526" y="305" width="14" height="47" rx="2" fill="#3B82F6"/>
+  <rect x="546" y="310" width="14" height="42" rx="2" fill="#60A5FA"/>
+  <rect x="566" y="298" width="14" height="54" rx="2" fill="#2563EB"/>
+  <rect x="586" y="282" width="14" height="70" rx="2" fill="#1D4ED8"/>
+  <rect x="606" y="292" width="14" height="60" rx="2" fill="#2563EB"/>
+  <line x1="218" y1="352" x2="640" y2="352" stroke="#E2E8F0" stroke-width="1"/>
+
+  <!-- Request table panel -->
+  <rect x="658" y="238" width="234" height="136" rx="8" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="672" y="256" font-size="12" font-weight="600" fill="#0F172A">Live Requests</text>
+  <rect x="664" y="263" width="222" height="22" rx="0" fill="#F8FAFC"/>
+  <text x="672" y="278" font-size="9" fill="#64748B" font-weight="700">STATUS</text>
+  <text x="720" y="278" font-size="9" fill="#64748B" font-weight="700">MODEL</text>
+  <text x="830" y="278" font-size="9" fill="#64748B" font-weight="700">LAT</text>
+  <rect x="668" y="289" width="32" height="14" rx="7" fill="#DCFCE7"/>
+  <text x="684" y="300" text-anchor="middle" font-size="8" fill="#15803D" font-weight="700">200</text>
+  <text x="716" y="300" font-size="8.5" fill="#334155" font-family="monospace">claude-3-5-sonnet</text>
+  <text x="838" y="300" font-size="8.5" fill="#64748B">312ms</text>
+  <rect x="668" y="307" width="32" height="14" rx="7" fill="#DCFCE7"/>
+  <text x="684" y="318" text-anchor="middle" font-size="8" fill="#15803D" font-weight="700">200</text>
+  <text x="716" y="318" font-size="8.5" fill="#334155" font-family="monospace">claude-opus-4</text>
+  <text x="838" y="318" font-size="8.5" fill="#64748B">892ms</text>
+  <rect x="668" y="325" width="32" height="14" rx="7" fill="#DCFCE7"/>
+  <text x="684" y="336" text-anchor="middle" font-size="8" fill="#15803D" font-weight="700">200</text>
+  <text x="716" y="336" font-size="8.5" fill="#334155" font-family="monospace">claude-haiku-4</text>
+  <text x="838" y="336" font-size="8.5" fill="#64748B">124ms</text>
+  <rect x="668" y="343" width="32" height="14" rx="7" fill="#FEF2F2"/>
+  <text x="684" y="354" text-anchor="middle" font-size="8" fill="#EF4444" font-weight="700">429</text>
+  <text x="716" y="354" font-size="8.5" fill="#334155" font-family="monospace">claude-3-5-sonnet</text>
+  <text x="838" y="354" font-size="8.5" fill="#64748B">43ms</text>
+
+  <!-- Model router panel -->
+  <rect x="208" y="384" width="440" height="108" rx="8" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="222" y="402" font-size="12" font-weight="600" fill="#0F172A">Model Router</text>
+  <text x="222" y="416" font-size="10" fill="#94A3B8">Claude → Provider model mappings</text>
+  <rect x="216" y="424" width="424" height="20" rx="0" fill="#F8FAFC"/>
+  <text x="226" y="437" font-size="9" fill="#64748B" font-weight="700">CLAUDE MODEL</text>
+  <text x="440" y="437" font-size="9" fill="#64748B" font-weight="700">→</text>
+  <text x="460" y="437" font-size="9" fill="#64748B" font-weight="700">PROVIDER MODEL</text>
+  <text x="624" y="437" font-size="9" fill="#64748B" font-weight="700">STATUS</text>
+  <text x="226" y="456" font-size="9.5" fill="#1D4ED8" font-family="monospace">claude-3-5-sonnet-20241022</text>
+  <text x="440" y="456" font-size="9" fill="#64748B">→</text>
+  <text x="460" y="456" font-size="9.5" fill="#0F172A" font-family="monospace">z-ai/glm-5.1</text>
+  <rect x="622" y="447" width="40" height="14" rx="7" fill="#DCFCE7"/>
+  <text x="642" y="458" text-anchor="middle" font-size="8" fill="#15803D" font-weight="700">Active</text>
+  <text x="226" y="472" font-size="9.5" fill="#1D4ED8" font-family="monospace">claude-opus-4-20250514</text>
+  <text x="440" y="472" font-size="9" fill="#64748B">→</text>
+  <text x="460" y="472" font-size="9.5" fill="#0F172A" font-family="monospace">z-ai/glm-5.1</text>
+  <rect x="622" y="463" width="40" height="14" rx="7" fill="#DCFCE7"/>
+  <text x="642" y="474" text-anchor="middle" font-size="8" fill="#15803D" font-weight="700">Active</text>
+  <text x="226" y="488" font-size="9.5" fill="#1D4ED8" font-family="monospace">claude*haiku* (family rule)</text>
+  <text x="440" y="488" font-size="9" fill="#64748B">→</text>
+  <text x="460" y="488" font-size="9.5" fill="#0F172A" font-family="monospace">z-ai/glm-5.1</text>
+  <rect x="622" y="479" width="40" height="14" rx="7" fill="#DBEAFE"/>
+  <text x="642" y="490" text-anchor="middle" font-size="8" fill="#1D4ED8" font-weight="700">Rule</text>
+
+  <!-- Settings panel preview -->
+  <rect x="658" y="384" width="234" height="108" rx="8" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="672" y="402" font-size="12" font-weight="600" fill="#0F172A">Gateway Settings</text>
+  <text x="672" y="418" font-size="10" fill="#94A3B8">Runtime config · no restart needed</text>
+  <text x="672" y="438" font-size="9.5" fill="#64748B">Base URL</text>
+  <rect x="672" y="444" width="208" height="18" rx="4" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="680" y="456" font-size="8.5" fill="#475569" font-family="monospace">api.bluesminds.com/v1</text>
+  <text x="672" y="474" font-size="9.5" fill="#64748B">Default Model</text>
+  <rect x="672" y="480" width="208" height="18" rx="4" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="680" y="492" font-size="8.5" fill="#475569" font-family="monospace">z-ai/glm-5.1</text>
+</svg>

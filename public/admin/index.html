@@ -1,0 +1,1360 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Free Claude Code Gateway — Universal Claude-Compatible AI Gateway</title>
+  <meta name="description" content="Free Claude Code Gateway is a Claude-compatible AI gateway that allows developers to use Claude Code with Kimi, GLM, DeepSeek, OpenAI-compatible providers and other AI models through a single endpoint." />
+  <meta name="keywords" content="Claude Code, Claude Code Gateway, Claude Compatible API, Claude Compatible Proxy, Claude API Gateway, Claude Code Proxy, AI Gateway, Model Router, Kimi API, GLM API, DeepSeek API, OpenAI Compatible API" />
+  <meta property="og:title" content="Free Claude Code Gateway | Universal Claude-Compatible AI Gateway" />
+  <meta property="og:description" content="Route Claude Code requests to multiple AI providers through a single Claude-compatible endpoint." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/admin/assets/dashboard.css" />
+</head>
+<body>
+  <div class="app-layout">
+
+    <!-- ── Sidebar ─────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </div>
+          <div class="brand-text">
+            <div class="brand-name">FCC Gateway</div>
+            <div class="brand-sub">Universal Claude-Compatible AI Gateway</div>
+          </div>
+        </div>
+        <span class="version-badge" id="version-badge">v1.0.0</span>
+      </div>
+
+      <nav class="sidebar-nav" role="navigation">
+        <div class="nav-section-label">Main</div>
+        <a class="nav-item active" data-view="overview" href="#overview">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span>Overview</span>
+        </a>
+        <a class="nav-item" data-view="requests" href="#requests">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span>Live Requests</span>
+        </a>
+        <a class="nav-item" data-view="playground" href="#playground">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span>Playground</span>
+        </a>
+
+        <div class="nav-section-label">Management</div>
+        <a class="nav-item" data-view="providers" href="#providers">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          <span>Providers</span>
+        </a>
+        <a class="nav-item" data-view="models" href="#models">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+          <span>Model Router</span>
+        </a>
+
+        <div class="nav-section-label">System</div>
+        <a class="nav-item" data-view="settings" href="#settings">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          <span>Settings</span>
+        </a>
+        <a class="nav-item" data-view="diagnostics" href="#diagnostics">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>Diagnostics</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-indicator" id="sidebar-status">
+          <span class="status-dot live"></span>
+          <span>Gateway Live</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── Main Content ────────────────────────────────────── -->
+    <div class="main-wrap">
+
+      <!-- Top Header -->
+      <header class="topbar">
+        <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+
+        <div class="topbar-left">
+          <h1 class="page-title" id="page-title">Overview</h1>
+          <p class="page-subtitle" id="page-subtitle">Monitor requests, latency, models, and provider health in real time.</p>
+        </div>
+
+        <div class="topbar-right">
+          <div class="search-wrap" id="search-trigger" role="button" tabindex="0" aria-label="Open command palette">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" class="search-input" placeholder="Search…" id="search-input" readonly />
+            <kbd>⌘K</kbd>
+          </div>
+
+          <span class="env-badge" id="env-badge" title="Current environment">local</span>
+
+          <div class="conn-wrap" id="conn-pill">
+            <span class="status-dot live"></span>
+            <span>Live</span>
+          </div>
+
+          <button class="btn btn-outline btn-sm" id="copy-proxy-btn" type="button" aria-label="Copy Proxy URL">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            <span>Copy Proxy URL</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Persistence Banner (subtle, success-styled) -->
+      <div class="persist-pill hidden" id="persist-banner">
+        <span class="persist-pill-dot"></span>
+        <span class="persist-pill-text">Data persistence enabled</span>
+        <span class="persist-pill-sep">·</span>
+        <span class="persist-pill-sub">Request history, config, and model mappings are saved to disk.</span>
+      </div>
+
+      <!-- Page Content Container -->
+      <main class="page-content" id="page-content">
+
+        <!-- ═══════════════════════ OVERVIEW ═══════════════════ -->
+        <section class="view" data-view="overview">
+
+          <!-- Compact Gateway Status Header -->
+          <div class="status-header stagger-item" id="status-header">
+            <div class="status-header-top">
+              <div class="status-header-meta">
+                <div class="status-pill status-pill-live" id="status-pill-gateway">
+                  <span class="status-dot live"></span>
+                  <span>Gateway Live</span>
+                </div>
+                <div class="status-header-divider"></div>
+                <div class="status-header-field">
+                  <span class="status-header-label">Provider</span>
+                  <span class="status-header-value" id="status-provider">Upstream Provider</span>
+                </div>
+                <div class="status-header-divider"></div>
+                <div class="status-header-field">
+                  <span class="status-header-label">Default Model</span>
+                  <span class="status-header-value mono" id="status-default-model">—</span>
+                </div>
+                <div class="status-header-divider"></div>
+                <div class="status-header-field">
+                  <span class="status-header-label">Endpoints</span>
+                  <span class="status-header-value">Claude &amp; OpenAI</span>
+                </div>
+              </div>
+              <div class="status-header-actions">
+                <button id="header-copy-proxy" class="btn btn-outline btn-sm" type="button" aria-label="Copy Proxy URL">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  Copy Proxy URL
+                </button>
+                <button id="header-playground" class="btn btn-outline btn-sm" type="button">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Playground
+                </button>
+                <button id="header-diagnostics" class="btn btn-primary btn-sm" type="button">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  Run Diagnostic
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Operational Alert Strip -->
+          <div class="alert-stack" id="alert-stack"></div>
+
+          <!-- KPI Grid -->
+          <div class="kpi-grid" id="kpi-grid"></div>
+
+          <!-- Main Analytics: Requests + Latency -->
+          <div class="grid-2col grid-analytics">
+            <div class="panel panel-chart">
+              <div class="panel-head">
+                <div>
+                  <h2>Requests Over Time</h2>
+                  <p class="panel-sub">Rolling 60-second window</p>
+                </div>
+                <div class="panel-actions">
+                  <div class="seg-control" role="tablist" aria-label="Time range">
+                    <button class="seg-btn active" data-range="60">60s</button>
+                    <button class="seg-btn" data-range="300">5m</button>
+                    <button class="seg-btn" data-range="900">15m</button>
+                  </div>
+                </div>
+              </div>
+              <div class="chart-wrap" id="chart-requests-wrap"><canvas id="chart-requests"></canvas></div>
+              <div class="chart-empty hidden" id="chart-requests-empty">
+                <div class="chart-empty-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                </div>
+                <h3>No traffic yet</h3>
+                <p>Send a request from Playground or connect Claude Code to see live request activity here.</p>
+                <div class="chart-empty-actions">
+                  <button class="btn btn-primary btn-sm" id="empty-playground" type="button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Open Playground
+                  </button>
+                  <button class="btn btn-outline btn-sm" id="empty-copy-curl" type="button">Copy cURL</button>
+                </div>
+              </div>
+            </div>
+            <div class="panel panel-chart">
+              <div class="panel-head">
+                <div>
+                  <h2>Latency Distribution</h2>
+                  <p class="panel-sub" id="latency-summary">All requests</p>
+                </div>
+              </div>
+              <div class="chart-wrap chart-wrap-donut" id="chart-latency-wrap">
+                <div class="donut-center">
+                  <div class="donut-center-label" id="latency-center-label">P95</div>
+                  <div class="donut-center-value" id="latency-center-value">—</div>
+                </div>
+                <canvas id="chart-latency"></canvas>
+              </div>
+              <div class="latency-legend" id="latency-legend"></div>
+              <div class="latency-warning hidden" id="latency-warning">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="latency-warning-icon"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span id="latency-warning-text">Most requests are slower than 1 second.</span>
+              </div>
+              <div class="chart-empty hidden" id="chart-latency-empty">
+                <div class="chart-empty-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <h3>No latency samples yet</h3>
+                <p>Run a test request to generate latency data and see response time distribution.</p>
+                <div class="chart-empty-actions">
+                  <button class="btn btn-primary btn-sm" id="empty-test" type="button">Run Test</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Per-Model Usage + Latest Failures -->
+          <div class="grid-ops">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>Per-Model Usage</h2>
+                  <p class="panel-sub">Find slow, failing, or heavily used model routes.</p>
+                </div>
+                <div class="panel-actions">
+                  <div class="model-filters">
+                    <input id="model-search" class="table-search" type="text" placeholder="Search model…" aria-label="Search model" />
+                    <div class="seg-control seg-control-sm">
+                      <button class="seg-btn active" data-status="all">All</button>
+                      <button class="seg-btn" data-status="healthy">Healthy</button>
+                      <button class="seg-btn" data-status="errors">Errors</button>
+                      <button class="seg-btn" data-status="slow">Slow</button>
+                    </div>
+                  </div>
+                  <label class="inline-field">
+                    <span>In $/1M</span>
+                    <input id="input-price" type="number" min="0" step="0.01" value="0" />
+                  </label>
+                  <label class="inline-field">
+                    <span>Out $/1M</span>
+                    <input id="output-price" type="number" min="0" step="0.01" value="0" />
+                  </label>
+                  <button id="clear-stats" class="btn btn-outline btn-sm" type="button" aria-label="Reset metrics">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                    Reset
+                  </button>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table sortable" id="model-table">
+                  <thead>
+                    <tr>
+                      <th data-sort="model">Model</th>
+                      <th data-sort="providerModel" class="hide-sm">Provider Model</th>
+                      <th data-sort="requestCount" class="num">Requests</th>
+                      <th data-sort="successCount" class="num hide-sm">Success</th>
+                      <th data-sort="errorCount" class="num">Errors</th>
+                      <th data-sort="errorRate" class="num hide-sm">Err. Rate</th>
+                      <th data-sort="inputTokens" class="num hide-sm">In Tok</th>
+                      <th data-sort="outputTokens" class="num hide-sm">Out Tok</th>
+                      <th data-sort="avgLatencyMs" class="num">Avg Lat</th>
+                      <th data-sort="status" class="hide-sm">Status</th>
+                      <th class="col-action">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="model-tbody"><tr><td colspan="11" class="empty-row">No data yet</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="panel-ops-col">
+              <div class="panel">
+                <div class="panel-head">
+                  <div>
+                    <h2>Latest Failures</h2>
+                    <p class="panel-sub">Recent errors grouped by signature.</p>
+                  </div>
+                  <button class="btn btn-ghost btn-sm" id="view-all-failures" type="button">View all</button>
+                </div>
+                <ul class="failure-list" id="failure-list">
+                  <li class="failure-empty">No failures recorded yet.</li>
+                </ul>
+              </div>
+              <div class="panel">
+                <div class="panel-head">
+                  <div>
+                    <h2>Gateway Routes</h2>
+                    <p class="panel-sub">Active API endpoints exposed by this proxy.</p>
+                  </div>
+                </div>
+                <ul class="route-list" id="route-list"></ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom row: Setup Checklist + Gateway Info -->
+          <div class="grid-bottom">
+            <div class="panel panel-collapse" id="setup-panel">
+              <div class="panel-head panel-head-collapse">
+                <div class="panel-head-left" id="setup-toggle" role="button" tabindex="0" aria-expanded="false">
+                  <svg class="panel-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  <div>
+                    <h2>Setup Checklist</h2>
+                    <p class="panel-sub" id="setup-summary">6 / 6 checks passed</p>
+                  </div>
+                </div>
+                <div class="panel-actions">
+                  <div class="checklist-progress checklist-progress-inline">
+                    <div class="checklist-progress-bar"><div class="checklist-progress-fill" id="checklist-progress" style="width:0%"></div></div>
+                  </div>
+                </div>
+              </div>
+              <div class="panel-collapse-body hidden" id="setup-body">
+                <ul class="checklist" id="setup-checklist"></ul>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>Gateway Info</h2>
+                  <p class="panel-sub">Runtime and configuration details.</p>
+                </div>
+              </div>
+              <div class="info-rows" id="gateway-info"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════ REQUESTS ═══════════════════ -->
+        <section class="view" data-view="requests" hidden>
+          <div class="page-header page-header-compact">
+            <div class="page-header-text">
+              <h2>Live Request Monitor</h2>
+              <p>Real-time feed of every proxied request across Claude-compatible and OpenAI-compatible endpoints.</p>
+            </div>
+          </div>
+
+          <div class="alert-stack" id="req-alert-stack"></div>
+
+          <div class="summary-bar" id="req-summary-bar"></div>
+
+          <div class="filter-toolbar">
+            <input id="req-search" class="filter-search" type="text" placeholder="Search request ID, model, path…" aria-label="Search requests" />
+            <select id="req-filter-status" class="filter-select" aria-label="Filter by status">
+              <option value="all">All Status</option>
+              <option value="2xx">2xx Success</option>
+              <option value="4xx">4xx Client</option>
+              <option value="5xx">5xx Server</option>
+              <option value="429">429 Rate Limited</option>
+              <option value="timeout">Timeout</option>
+            </select>
+            <select id="req-filter-endpoint" class="filter-select" aria-label="Filter by endpoint">
+              <option value="all">All Endpoints</option>
+              <option value="claude">/v1/messages</option>
+              <option value="openai">/v1/chat/completions</option>
+              <option value="models">/v1/models</option>
+            </select>
+            <select id="req-filter-model" class="filter-select" aria-label="Filter by model">
+              <option value="all">All Models</option>
+            </select>
+            <select id="req-filter-stream" class="filter-select" aria-label="Filter by stream">
+              <option value="all">All Streams</option>
+              <option value="yes">Streamed</option>
+              <option value="no">Non-Streamed</option>
+            </select>
+            <div class="filter-toolbar-spacer"></div>
+            <span id="paused-badge" class="badge badge-warning hidden">0 buffered</span>
+            <button id="pause-btn" class="btn btn-outline btn-sm" type="button" aria-label="Pause feed">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon" id="pause-icon"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              <span id="pause-text">Pause</span>
+            </button>
+            <button id="clear-requests-btn" class="btn btn-outline-danger btn-sm" type="button" aria-label="Clear feed">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+              Clear
+            </button>
+            <button class="btn btn-outline btn-sm" type="button" id="req-copy-curl" aria-label="Copy cURL">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy cURL
+            </button>
+          </div>
+
+          <div class="panel panel-table-flush">
+            <div class="table-wrap scrollable">
+              <table class="data-table data-table-dense" id="request-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Status</th>
+                    <th>Endpoint</th>
+                    <th>Client Model</th>
+                    <th>Resolved Model</th>
+                    <th>Provider</th>
+                    <th class="num">Tokens</th>
+                    <th class="num">Latency</th>
+                    <th>Stream</th>
+                    <th>Request ID</th>
+                  </tr>
+                </thead>
+                <tbody id="request-tbody"></tbody>
+              </table>
+              <div class="empty-state-lg hidden" id="request-empty">
+                <div class="empty-state-icon-lg">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                </div>
+                <h3>No requests received yet</h3>
+                <p>Connect Claude Code, Cline, Roo, or Continue — or run a Playground test — to see live traffic here.</p>
+                <div class="empty-actions">
+                  <button class="btn btn-primary btn-sm" id="empty-req-playground" type="button">Open Playground</button>
+                  <button class="btn btn-outline btn-sm" id="empty-req-claudecode" type="button">Copy Claude Code Env</button>
+                  <button class="btn btn-outline btn-sm" id="empty-req-curl" type="button">Copy cURL Test</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════ PLAYGROUND ═════════════════ -->
+        <section class="view" data-view="playground" hidden>
+          <div class="page-header">
+            <div class="page-header-text">
+              <h2>API Playground</h2>
+              <p>Send test requests to Claude or OpenAI endpoints and inspect the full translation pipeline.</p>
+            </div>
+          </div>
+
+          <div class="playground-layout">
+            <div class="pg-left">
+              <div class="panel">
+                <div class="panel-head"><h2>Request Configuration</h2></div>
+                <div class="form-grid">
+                  <label>
+                    <span>Endpoint</span>
+                    <select id="pg-endpoint">
+                      <option value="claude">Claude &nbsp;/v1/messages</option>
+                      <option value="openai">OpenAI &nbsp;/v1/chat/completions</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Model</span>
+                    <input id="pg-model" type="text" value="claude-3-5-sonnet-20241022" />
+                  </label>
+                  <label>
+                    <span>System Prompt</span>
+                    <textarea id="pg-system" rows="3" placeholder="You are a helpful assistant."></textarea>
+                  </label>
+                  <label>
+                    <span>User Message</span>
+                    <textarea id="pg-message" rows="5" placeholder="Hello, how are you?"></textarea>
+                  </label>
+                  <div class="pg-params-panel">
+                    <div class="pg-params-title">Parameters</div>
+
+                    <div class="pg-param-row">
+                      <div class="pg-param-header">
+                        <span class="pg-param-label">Temperature</span>
+                        <span class="pg-param-value" id="pg-temp-val">0.7</span>
+                      </div>
+                      <span class="pg-param-hint">Controls randomness</span>
+                      <input id="pg-temp" type="range" min="0" max="2" step="0.1" value="0.7" />
+                    </div>
+
+                    <div class="pg-param-row">
+                      <div class="pg-param-header">
+                        <span class="pg-param-label">Max Tokens</span>
+                        <input id="pg-maxtok" type="number" min="64" max="8192" step="64" value="1024" class="pg-param-number" />
+                      </div>
+                      <span class="pg-param-hint">Maximum response length</span>
+                    </div>
+
+                    <div class="pg-param-row">
+                      <div class="pg-param-header">
+                        <span class="pg-param-label">Top P</span>
+                        <span class="pg-param-value" id="pg-topp-val">1.00</span>
+                      </div>
+                      <span class="pg-param-hint">Nucleus sampling</span>
+                      <input id="pg-topp" type="range" min="0" max="1" step="0.05" value="1" />
+                    </div>
+
+                    <div class="pg-toggle-divider"></div>
+
+                    <div class="pg-toggle-row">
+                      <div class="pg-toggle-info">
+                        <div class="pg-toggle-label-row">
+                          <span class="pg-toggle-label">Streaming</span>
+                          <span class="pg-param-badge">Experimental</span>
+                        </div>
+                        <span class="pg-toggle-hint">Server-sent response</span>
+                      </div>
+                      <label class="toggle-switch">
+                        <input id="pg-stream" type="checkbox" />
+                        <span class="toggle-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                  <div class="form-actions">
+                    <button id="pg-run" class="btn btn-primary" type="button">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      Run Request
+                    </button>
+                    <button id="pg-copy-curl" class="btn btn-outline" type="button">Copy cURL</button>
+                    <button id="pg-copy-json" class="btn btn-outline" type="button">Copy JSON</button>
+                    <button id="pg-clear" class="btn btn-ghost" type="button">Clear</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="pg-right">
+              <div class="panel">
+                <div class="panel-head">
+                  <h2>Response</h2>
+                  <span class="pg-response-status" id="pg-response-status"></span>
+                </div>
+                <div class="pg-output" id="pg-output">
+                  <div class="empty-state">
+                    <div class="empty-state-icon-lg">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </div>
+                    <h3>Ready to test</h3>
+                    <p>Configure your request on the left and click Run Request to see the response.</p>
+                  </div>
+                </div>
+                <div class="pg-meta" id="pg-meta" hidden>
+                  <div class="pg-meta-row">
+                    <div class="pg-meta-label">Input tokens</div>
+                    <div class="pg-meta-value" id="pg-in-tok">—</div>
+                  </div>
+                  <div class="pg-meta-row">
+                    <div class="pg-meta-label">Output tokens</div>
+                    <div class="pg-meta-value" id="pg-out-tok">—</div>
+                  </div>
+                  <div class="pg-meta-row">
+                    <div class="pg-meta-label">Latency</div>
+                    <div class="pg-meta-value" id="pg-latency">—</div>
+                  </div>
+                  <div class="pg-meta-row">
+                    <div class="pg-meta-label">Cost</div>
+                    <div class="pg-meta-value" id="pg-cost">—</div>
+                  </div>
+                  <div class="pg-meta-row">
+                    <div class="pg-meta-label">Status</div>
+                    <div class="pg-meta-value" id="pg-status-code">—</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel" id="pg-debug-panel">
+                <div class="panel-head"><h2>Debug Pipeline</h2></div>
+                <div class="pg-debug-tabs">
+                  <button class="pg-debug-tab active" data-tab="raw-req">Raw Request</button>
+                  <button class="pg-debug-tab" data-tab="converted">Converted Payload</button>
+                  <button class="pg-debug-tab" data-tab="raw-res">Provider Response</button>
+                  <button class="pg-debug-tab" data-tab="curl">cURL</button>
+                </div>
+                <div class="pg-debug-content" id="tab-raw-req"><code id="pg-debug-req">// Send a request to see the raw Claude/OpenAI body</code></div>
+                <div class="pg-debug-content hidden" id="tab-converted"><code id="pg-debug-converted">// The translated provider payload will appear here</code></div>
+                <div class="pg-debug-content hidden" id="tab-raw-res"><code id="pg-debug-res">// The provider's raw response will appear here</code></div>
+                <div class="pg-debug-content hidden" id="tab-curl"><code id="pg-debug-curl">// cURL command will appear here</code></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════ PROVIDERS ══════════════════ -->
+        <section class="view" data-view="providers" hidden>
+          <div class="page-header">
+            <div class="page-header-text">
+              <h2>Providers</h2>
+              <p>Manage upstream AI provider connections, API keys, base URLs, and discover new integrations.</p>
+            </div>
+            <div class="page-header-actions">
+              <button id="provider-test-all" class="btn btn-outline" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Test All
+              </button>
+              <button id="provider-fetch-models" class="btn btn-primary" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                Sync Models
+              </button>
+            </div>
+          </div>
+
+          <div class="provider-grid" id="provider-grid"></div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>Provider Marketplace</h2></div>
+            <p class="help-text" style="margin-bottom:14px">Connect additional providers as they become available.</p>
+            <div class="marketplace-grid">
+              <div class="marketplace-card active">
+                <div class="marketplace-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                </div>
+                <div class="marketplace-info">
+                  <span class="marketplace-name">OpenAI Compatible</span>
+                </div>
+                <span class="badge badge-success">Active</span>
+              </div>
+              <div class="marketplace-card disabled">
+                <div class="marketplace-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                </div>
+                <div class="marketplace-info">
+                  <span class="marketplace-name">Anthropic Compatible</span>
+                </div>
+                <span class="badge badge-muted">Soon</span>
+              </div>
+              <div class="marketplace-card disabled">
+                <div class="marketplace-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 000 20 14.5 14.5 0 000-20"/><path d="M2 12h20"/></svg>
+                </div>
+                <div class="marketplace-info">
+                  <span class="marketplace-name">OpenRouter</span>
+                </div>
+                <span class="badge badge-muted">Soon</span>
+              </div>
+              <div class="marketplace-card disabled">
+                <div class="marketplace-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </div>
+                <div class="marketplace-info">
+                  <span class="marketplace-name">AWS Bedrock</span>
+                </div>
+                <span class="badge badge-muted">Soon</span>
+              </div>
+              <div class="marketplace-card disabled">
+                <div class="marketplace-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </div>
+                <div class="marketplace-info">
+                  <span class="marketplace-name">Google Gemini</span>
+                </div>
+                <span class="badge badge-muted">Soon</span>
+              </div>
+              <div class="marketplace-card disabled">
+                <div class="marketplace-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
+                </div>
+                <div class="marketplace-info">
+                  <span class="marketplace-name">Ollama</span>
+                </div>
+                <span class="badge badge-muted">Soon</span>
+              </div>
+              <div class="marketplace-card disabled">
+                <div class="marketplace-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+                </div>
+                <div class="marketplace-info">
+                  <span class="marketplace-name">Custom HTTP</span>
+                </div>
+                <span class="badge badge-muted">Soon</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════ MODELS ════════════════════ -->
+        <section class="view" data-view="models" hidden>
+          <div class="page-header">
+            <div class="page-header-text">
+              <h2>Model Router</h2>
+              <p>Map incoming Claude model names to provider models and control fallback routing.</p>
+            </div>
+            <div class="page-header-actions">
+              <button id="add-mapping" class="btn btn-outline" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Mapping
+              </button>
+              <button id="save-mappings" class="btn btn-primary" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save Router
+              </button>
+              <button id="refresh-available" class="btn btn-outline" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                Sync Models
+              </button>
+              <button id="export-mappings" class="btn btn-outline" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export
+              </button>
+            </div>
+          </div>
+
+          <!-- Default Fallback Model -->
+          <div class="panel router-default-panel">
+            <div class="panel-head">
+              <h2>
+                <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Default Fallback Model
+              </h2>
+              <span class="badge badge-success" id="default-model-status">Active</span>
+            </div>
+            <div class="form-grid" style="max-width:480px">
+              <label>
+                <span>Provider Model</span>
+                <input id="default-model-input" class="mapping-input" type="text" placeholder="e.g. moonshotai/kimi-k2.6" />
+                <small class="help-text">Used when no specific mapping matches the incoming Claude model name.</small>
+              </label>
+            </div>
+            <div class="form-actions" style="margin-top:14px">
+              <button class="btn btn-outline btn-sm" id="test-default-model" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Test Default Model
+              </button>
+            </div>
+          </div>
+
+          <!-- Model Mappings -->
+          <div class="panel router-mappings-panel">
+            <div class="panel-head">
+              <h2>
+                <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Model Mappings
+              </h2>
+              <span class="panel-label" id="mapping-count">0 mappings</span>
+            </div>
+            <div class="table-wrap">
+              <table class="mapping-table" id="mappings-table">
+                <thead>
+                  <tr>
+                    <th>Claude Model</th>
+                    <th>Provider</th>
+                    <th>Provider Model</th>
+                    <th>Status</th>
+                    <th class="col-action">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="mappings-tbody"></tbody>
+              </table>
+              <div class="empty-state-lg hidden" id="mappings-empty">
+                <div class="router-empty-compact">
+                  <div class="router-empty-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  </div>
+                  <h3>No mappings configured</h3>
+                  <p>Create your first route to map Claude model names to upstream provider models.</p>
+                  <div class="router-empty-recommend">
+                    <div class="router-empty-recommend-label">Recommended</div>
+                    <ul class="router-empty-recommend-list">
+                      <li><code>claude-3-5-sonnet-20241022</code><span class="router-empty-arrow">→</span><code>moonshotai/kimi-k2.6</code></li>
+                      <li><code>claude-haiku-4-5-20251001</code><span class="router-empty-arrow">→</span><code>gpt-5-nano</code></li>
+                    </ul>
+                  </div>
+                  <div class="empty-actions">
+                    <button class="btn btn-primary btn-sm" id="empty-add-recommended" type="button">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="20 6 9 17 4 12"/></svg>
+                      Add Recommended Mappings
+                    </button>
+                    <button class="btn btn-outline btn-sm" id="empty-add-mapping" type="button">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      Add Custom Mapping
+                    </button>
+                    <button class="btn btn-outline btn-sm" id="empty-sync-models" type="button">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                      Sync Provider Models
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="mappings-status" class="status-line" aria-live="polite" style="margin-top:12px"></div>
+          </div>
+
+          <!-- Router Health Summary -->
+          <div class="panel router-health-panel">
+            <div class="panel-head">
+              <h2>
+                <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                Router Health
+              </h2>
+              <span class="panel-label" id="router-health-summary">—</span>
+            </div>
+            <div class="router-health-grid" id="router-health-grid"></div>
+          </div>
+
+          <!-- Family Routing Rules -->
+          <div class="panel router-family-panel">
+            <div class="panel-head">
+              <h2>
+                <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                Family Routing Rules
+              </h2>
+              <span class="panel-label">Automatically route new Claude model versions without manual mapping.</span>
+            </div>
+            <div class="table-wrap router-table-wrap">
+              <table class="data-table data-table-dense router-family-table">
+                <thead>
+                  <tr>
+                    <th>Family</th>
+                    <th>Pattern</th>
+                    <th>Primary Model</th>
+                    <th>Backup Model</th>
+                    <th class="col-action">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="router-family-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Auto-Fallback Models -->
+          <div class="panel router-fallback-panel">
+            <div class="panel-head">
+              <h2>
+                <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                Auto-Fallback Models
+              </h2>
+              <span class="panel-label" id="router-fallback-summary">Models handled automatically by fallback rules.</span>
+            </div>
+            <div id="router-fallback-body"></div>
+          </div>
+
+          <!-- Available Provider Models -->
+          <div class="panel router-available-panel" id="available-panel">
+            <div class="panel-head">
+              <h2>
+                <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                Available Provider Models
+              </h2>
+              <span class="panel-label" id="available-count-label">0 synced</span>
+            </div>
+            <p class="help-text" id="available-error"></p>
+            <div class="router-available-toolbar">
+              <input id="available-search" class="filter-search" type="text" placeholder="Search models…" aria-label="Search provider models" />
+              <div class="seg-control seg-control-sm">
+                <button class="seg-btn active" data-available-filter="all">All</button>
+                <button class="seg-btn" data-available-filter="mapped">Mapped</button>
+                <button class="seg-btn" data-available-filter="unmapped">Unmapped</button>
+              </div>
+              <div class="filter-toolbar-spacer"></div>
+              <button class="btn btn-ghost btn-sm" type="button" id="available-deselect">Clear selection</button>
+            </div>
+            <div class="router-available-body" id="available-body">
+              <div class="router-available-empty">
+                <div class="router-available-empty-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                </div>
+                <div>
+                  <strong>No provider models synced yet</strong>
+                  <p>Click <em>Sync Models</em> above to fetch the model list from your provider.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════ SETTINGS ══════════════════ -->
+        <section class="view" data-view="settings" hidden>
+          <div class="page-header">
+            <div class="page-header-text">
+              <h2>Gateway Settings</h2>
+              <p>Configure provider connection, security, rate limits, and operational parameters.</p>
+            </div>
+            <div class="page-header-actions">
+              <span class="unsaved-indicator hidden" id="unsaved-indicator">Unsaved changes</span>
+              <button type="button" class="btn btn-outline" id="settings-reset">Discard Changes</button>
+              <button type="submit" form="config-form" class="btn btn-primary" id="settings-save">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save Settings
+              </button>
+            </div>
+          </div>
+
+          <div id="restart-banner" class="restart-banner hidden">
+            <div class="restart-banner-text">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="restart-banner-icon"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <div>
+                <strong>Restart required</strong>
+                <span>Some saved settings will only apply after the gateway restarts.</span>
+                <span id="restart-reasons" class="restart-reasons"></span>
+              </div>
+            </div>
+            <div class="restart-banner-actions">
+              <button type="button" class="btn btn-primary btn-sm" id="restart-gateway-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                Restart Gateway
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" id="restart-later-btn">Restart Later</button>
+            </div>
+          </div>
+
+          <form id="config-form">
+            <div class="settings-grid">
+              <!-- Provider Connection -->
+              <div class="settings-section">
+                <div class="settings-section-head">
+                  <h3>
+                    <span class="section-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+                    </span>
+                    Provider Connection
+                  </h3>
+                  <p>Connect the gateway to your upstream OpenAI-compatible provider.</p>
+                </div>
+                <div class="form-grid">
+                  <label>
+                    <span>Upstream Base URL</span>
+                    <input name="bluesmindsBaseUrl" type="url" required placeholder="https://api.example.com/v1" />
+                    <small class="help-text">Must start with http:// or https://</small>
+                  </label>
+                  <label>
+                    <span>Upstream API Key</span>
+                    <div class="secret-input-wrap">
+                      <input name="bluesmindsApiKey" type="password" autocomplete="off" placeholder="(leave blank to keep stored key)" />
+                      <button type="button" class="btn secret-toggle" aria-label="Toggle visibility">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      </button>
+                    </div>
+                    <small class="help-text">Status: <strong id="apikey-set">—</strong></small>
+                  </label>
+                  <label>
+                    <span>Default Model</span>
+                    <input name="defaultModel" type="text" required />
+                    <small class="help-text">Used as fallback when no model mapping matches.</small>
+                  </label>
+                </div>
+                <div class="form-actions" style="margin-top:16px">
+                  <button type="button" class="btn btn-outline" id="settings-test-conn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    Test Provider
+                  </button>
+                  <button type="button" class="btn btn-outline" id="settings-fetch-models">Sync Models</button>
+                </div>
+                <div id="settings-test-result" class="test-result" hidden></div>
+                <div id="settings-sync-result" class="test-result" hidden></div>
+              </div>
+
+              <!-- Security -->
+              <div class="settings-section">
+                <div class="settings-section-head">
+                  <h3>
+                    <span class="section-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </span>
+                    Security
+                  </h3>
+                  <p>Protect your proxy endpoints and control access.</p>
+                </div>
+                <div class="form-grid">
+                  <label>
+                    <span>Proxy API Key</span>
+                    <div class="secret-input-wrap">
+                      <input name="proxyApiKey" type="password" autocomplete="off" placeholder="(leave blank to keep existing)" />
+                      <button type="button" class="btn secret-toggle" aria-label="Toggle visibility">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      </button>
+                    </div>
+                    <small class="help-text">Status: <strong id="proxykey-set">—</strong></small>
+                  </label>
+                  <label>
+                    <span>Rate Limit (req/min)</span>
+                    <input name="rateLimitPerMinute" type="number" min="1" max="10000" required />
+                    <small class="help-text">Accepted range: 1 – 10000</small>
+                  </label>
+                  <label>
+                    <span>Allowed Origins</span>
+                    <input name="allowedOrigins" type="text" placeholder="https://app.example.com" />
+                    <small class="help-text">Comma-separated. Empty = allow all in dev.</small>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Limits -->
+              <div class="settings-section">
+                <div class="settings-section-head">
+                  <h3>
+                    <span class="section-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </span>
+                    Limits
+                  </h3>
+                  <p>Operational thresholds and resource caps.</p>
+                </div>
+                <div class="form-grid">
+                  <label>
+                    <span>Request Timeout (ms)</span>
+                    <input name="requestTimeoutMs" type="number" min="1000" max="600000" required />
+                    <small class="help-text">Accepted range: 1000 – 600000</small>
+                  </label>
+                  <label>
+                    <span>Max Body Size</span>
+                    <input name="maxBodySize" type="text" required placeholder="20mb" />
+                    <small class="help-text">Positive integer + unit (b, kb, mb, gb)</small>
+                    <small class="help-text" style="color:var(--warn-text)">Restart required for this setting to fully apply.</small>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Compatibility -->
+              <div class="settings-section">
+                <div class="settings-section-head">
+                  <h3>
+                    <span class="section-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    </span>
+                    Compatibility
+                  </h3>
+                  <p>Control which endpoints and protocol features are exposed.</p>
+                </div>
+                <div class="form-grid">
+                  <label class="checkbox-row">
+                    <input name="strictModelMapping" type="checkbox" />
+                    <span>Strict Model Mapping</span>
+                    <small class="help-text">Reject unknown models instead of passing through.</small>
+                  </label>
+                  <label class="checkbox-row" style="opacity:0.6; cursor:not-allowed">
+                    <input type="checkbox" disabled />
+                    <span>Streaming (SSE)</span>
+                    <small class="help-text">Coming soon</small>
+                  </label>
+                  <label class="checkbox-row" style="opacity:0.6; cursor:not-allowed">
+                    <input type="checkbox" disabled />
+                    <span>Tool Calling</span>
+                    <small class="help-text">Coming soon</small>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Logging -->
+              <div class="settings-section">
+                <div class="settings-section-head">
+                  <h3>
+                    <span class="section-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    </span>
+                    Logging
+                  </h3>
+                  <p>Control verbosity. Sensitive keys are always redacted.</p>
+                </div>
+                <div class="form-grid">
+                  <label class="checkbox-row">
+                    <input name="debugLogs" type="checkbox" />
+                    <span>Debug Logs</span>
+                    <small class="help-text">Enables verbose pino logging. Applies immediately. Secrets are always redacted.</small>
+                  </label>
+                </div>
+                <p class="help-text" style="margin-top:12px; padding:10px 12px; background:var(--warn-soft); border-radius:var(--radius-sm); color:var(--warn-text); font-weight:500">
+                  ℹ️ Logging is request-metadata only. Request and response bodies are never persisted.
+                </p>
+              </div>
+
+              <!-- Operations -->
+              <div class="settings-section">
+                <div class="settings-section-head">
+                  <h3>
+                    <span class="section-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    </span>
+                    Operations
+                  </h3>
+                  <p>Gateway process status and runtime controls.</p>
+                </div>
+                <div class="ops-grid" id="ops-grid">
+                  <div class="ops-tile">
+                    <span class="ops-label">Status</span>
+                    <span class="ops-value" id="ops-status">—</span>
+                  </div>
+                  <div class="ops-tile">
+                    <span class="ops-label">Process Manager</span>
+                    <span class="ops-value" id="ops-pm">—</span>
+                  </div>
+                  <div class="ops-tile">
+                    <span class="ops-label">Uptime</span>
+                    <span class="ops-value" id="ops-uptime">—</span>
+                  </div>
+                  <div class="ops-tile">
+                    <span class="ops-label">Node Version</span>
+                    <span class="ops-value" id="ops-node">—</span>
+                  </div>
+                </div>
+                <div id="ops-unavailable" class="ops-unavailable hidden">
+                  <p>Restart from dashboard is unavailable. Start with PM2 to enable safe restart.</p>
+                </div>
+                <div class="form-actions" style="margin-top:16px">
+                  <button type="button" class="btn btn-outline" id="ops-restart-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                    Restart Gateway
+                  </button>
+                  <button type="button" class="btn btn-outline" id="ops-health-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    Run Health Check
+                  </button>
+                </div>
+                <div id="ops-health-result" class="test-result" hidden></div>
+              </div>
+            </div>
+
+            <div id="config-status" class="status-line" aria-live="polite" style="margin-top:16px; text-align:right"></div>
+          </form>
+        </section>
+
+        <!-- ═══════════════════════ DIAGNOSTICS ════════════════ -->
+        <section class="view" data-view="diagnostics" hidden>
+          <div class="page-header">
+            <div class="page-header-text">
+              <h2>Provider Diagnostics</h2>
+              <p>Run step-by-step checks for provider connectivity, API key validity, and Claude-to-OpenAI translation.</p>
+            </div>
+            <div class="page-header-actions">
+              <button id="diag-run" class="btn btn-primary" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Run Full Diagnostic
+              </button>
+              <button id="diag-copy" class="btn btn-outline" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy Report
+              </button>
+              <button class="btn btn-outline" type="button" id="diag-settings-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                Open Settings
+              </button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>
+                <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                Diagnostic Timeline
+              </h2>
+            </div>
+            <div class="diag-progress" hidden id="diag-progress"><div class="diag-progress-bar" style="width:0%"></div></div>
+            <div class="diag-summary" id="diag-summary" hidden></div>
+            <div class="diag-timeline" id="diag-timeline"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>
+                <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Quick Connection Test
+              </h2>
+            </div>
+            <p class="help-text" style="margin-bottom:12px">Sends a single "Hello" message to the configured upstream provider using the current in-memory default model.</p>
+            <button id="test-connection" class="btn btn-primary" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              Test Provider
+            </button>
+            <div id="test-result" class="test-result" hidden></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>Error Reference</h2></div>
+            <div class="error-reference">
+              <div class="error-ref-item">
+                <span class="error-code">401</span>
+                <div class="error-ref-text">
+                  <strong>Unauthorized</strong>
+                  <p>Invalid or missing API key. Update the upstream key in Settings → Provider Connection.</p>
+                </div>
+              </div>
+              <div class="error-ref-item">
+                <span class="error-code">403</span>
+                <div class="error-ref-text">
+                  <strong>Permission Denied</strong>
+                  <p>API key is valid but lacks permission for this model. Try fetching available models.</p>
+                </div>
+              </div>
+              <div class="error-ref-item">
+                <span class="error-code">404</span>
+                <div class="error-ref-text">
+                  <strong>Model Not Found</strong>
+                  <p>The model name is unknown to the provider. Check Model Router and Default Model.</p>
+                </div>
+              </div>
+              <div class="error-ref-item">
+                <span class="error-code">429</span>
+                <div class="error-ref-text">
+                  <strong>Rate Limited</strong>
+                  <p>Provider rejected the request due to quota. Wait, reduce frequency, or upgrade.</p>
+                </div>
+              </div>
+              <div class="error-ref-item">
+                <span class="error-code">500</span>
+                <div class="error-ref-text">
+                  <strong>Provider Server Error</strong>
+                  <p>Upstream provider encountered an internal error. Retry after a short delay.</p>
+                </div>
+              </div>
+              <div class="error-ref-item">
+                <span class="error-code">timeout</span>
+                <div class="error-ref-text">
+                  <strong>Request Timeout</strong>
+                  <p>Provider did not respond within the configured timeout. Increase it in Settings → Limits.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Request Drawer -->
+  <div class="drawer-overlay hidden" id="drawer-overlay"></div>
+  <aside class="drawer hidden" id="drawer">
+    <div class="drawer-head">
+      <div>
+        <h3>Request Details <span class="status-pill" id="drawer-status"></span></h3>
+        <div class="drawer-sub" id="drawer-sub">—</div>
+      </div>
+      <button class="btn btn-icon-only" id="drawer-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Command Palette -->
+  <div class="cmd-overlay hidden" id="cmd-overlay">
+    <div class="cmd-panel">
+      <div class="cmd-search">
+        <svg class="cmd-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="cmd-input" id="cmd-input" placeholder="Type a command or search…" />
+        <kbd>esc</kbd>
+      </div>
+      <div class="cmd-list" id="cmd-list"></div>
+      <div class="cmd-footer">
+        <div class="cmd-hints">
+          <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+          <span><kbd>↵</kbd> select</span>
+        </div>
+        <span>FCC Gateway v<span id="cmd-version">1.0.0</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Copy Config Panel -->
+  <div class="cmd-overlay hidden" id="copy-config-overlay">
+    <div class="cmd-panel copy-config-panel">
+      <div class="panel-head" style="padding:18px 22px; border-bottom:1px solid var(--border)">
+        <h2>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="panel-icon" style="display:inline-block; vertical-align:-3px; margin-right:8px; width:18px; height:18px; color:var(--primary)"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          Connect Your Tools
+        </h2>
+        <button class="btn btn-icon-only" id="copy-config-close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="copy-config-body">
+        <p class="help-text" style="margin-bottom:14px">Copy configuration for your favorite AI coding tools and connect them to this gateway in seconds.</p>
+        <div class="config-tool-grid">
+          <div class="config-tool-card" data-tool="claude-code">
+            <div class="config-tool-icon">CC</div>
+            <span class="config-tool-name">Claude Code</span>
+          </div>
+          <div class="config-tool-card" data-tool="cline">
+            <div class="config-tool-icon">CL</div>
+            <span class="config-tool-name">Cline</span>
+          </div>
+          <div class="config-tool-card" data-tool="roo-code">
+            <div class="config-tool-icon">RC</div>
+            <span class="config-tool-name">Roo Code</span>
+          </div>
+          <div class="config-tool-card" data-tool="continue">
+            <div class="config-tool-icon">CN</div>
+            <span class="config-tool-name">Continue</span>
+          </div>
+          <div class="config-tool-card" data-tool="openai-client">
+            <div class="config-tool-icon">OA</div>
+            <span class="config-tool-name">OpenAI Client</span>
+          </div>
+          <div class="config-tool-card" data-tool="curl">
+            <div class="config-tool-icon">cR</div>
+            <span class="config-tool-name">cURL</span>
+          </div>
+        </div>
+        <div id="config-fields" class="hidden">
+          <div class="config-tabs" id="config-shell-tabs">
+            <button class="config-tab active" data-shell="bash">Bash / Zsh</button>
+            <button class="config-tab" data-shell="cmd">Windows CMD</button>
+            <button class="config-tab" data-shell="powershell">PowerShell</button>
+          </div>
+          <div class="code-block" id="config-code-block">
+            <button class="copy-btn-inline" id="cfg-copy-btn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              <span>Copy</span>
+            </button>
+            <pre id="cfg-pre" style="margin:0; white-space:pre-wrap; word-break:break-all">Select a tool to view configuration.</pre>
+          </div>
+          <div class="settings-grid-2" style="margin-top:12px">
+            <div>
+              <div class="pg-meta-label" style="margin-bottom:4px">Base URL</div>
+              <code id="cfg-base-url" style="display:block; padding:8px 10px; background:var(--bg-subtle); border-radius:var(--radius-sm); font-size:11.5px; word-break:break-all">—</code>
+            </div>
+            <div>
+              <div class="pg-meta-label" style="margin-bottom:4px">Default Model</div>
+              <code id="cfg-model" style="display:block; padding:8px 10px; background:var(--bg-subtle); border-radius:var(--radius-sm); font-size:11.5px; word-break:break-all">—</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Restart Confirmation Modal -->
+  <div class="cmd-overlay hidden" id="restart-modal-overlay">
+    <div class="cmd-panel" style="max-width:440px">
+      <div class="panel-head" style="padding:18px 22px; border-bottom:1px solid var(--border)">
+        <h2>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="panel-icon" style="display:inline-block; vertical-align:-3px; margin-right:8px; width:18px; height:18px; color:var(--warn)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Restart Gateway?
+        </h2>
+        <button class="btn btn-icon-only" id="restart-modal-close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="padding:22px">
+        <p style="font-size:14px; color:var(--text-secondary); line-height:1.6; margin:0 0 8px">
+          The proxy will restart and may be unavailable for a few seconds.<br>
+          Active requests may fail during restart.
+        </p>
+        <p id="restart-modal-reasons" style="font-size:13px; color:var(--text-muted); margin:0 0 20px"></p>
+        <div style="display:flex; gap:10px; justify-content:flex-end">
+          <button type="button" class="btn btn-outline" id="restart-modal-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="restart-modal-confirm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            Restart Gateway
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Restart Overlay -->
+  <div class="restart-overlay hidden" id="restart-overlay">
+    <div class="restart-overlay-inner">
+      <div class="restart-spinner"></div>
+      <h3>Restarting gateway…</h3>
+      <p id="restart-overlay-status">Waiting for server to come back online</p>
+    </div>
+  </div>
+
+  <script src="/admin/assets/dashboard.js" defer></script>
+</body>
+</html>

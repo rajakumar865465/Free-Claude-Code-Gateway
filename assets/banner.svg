@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 280" width="900" height="280" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0F172A"/>
+      <stop offset="50%" style="stop-color:#1E3A5F"/>
+      <stop offset="100%" style="stop-color:#1E1B4B"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#60A5FA"/>
+      <stop offset="50%" style="stop-color:#A78BFA"/>
+      <stop offset="100%" style="stop-color:#34D399"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="900" height="280" fill="url(#bgGrad)" rx="16"/>
+
+  <!-- Decorative circles -->
+  <circle cx="800" cy="60" r="120" fill="none" stroke="#2563EB" stroke-width="1" opacity="0.15"/>
+  <circle cx="800" cy="60" r="80" fill="none" stroke="#7C3AED" stroke-width="1" opacity="0.15"/>
+  <circle cx="100" cy="240" r="100" fill="none" stroke="#10B981" stroke-width="1" opacity="0.1"/>
+
+  <!-- Grid dots -->
+  <pattern id="dots" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+    <circle cx="15" cy="15" r="1" fill="#334155" opacity="0.5"/>
+  </pattern>
+  <rect width="900" height="280" fill="url(#dots)" rx="16"/>
+
+  <!-- Brand icon -->
+  <rect x="54" y="52" width="48" height="48" rx="12" fill="url(#textGrad)" opacity="0.2"/>
+  <rect x="54" y="52" width="48" height="48" rx="12" fill="none" stroke="#60A5FA" stroke-width="1.5" opacity="0.6"/>
+  <text x="78" y="83" text-anchor="middle" font-size="24" fill="#60A5FA" filter="url(#glow)">⬡</text>
+
+  <!-- Main title -->
+  <text x="118" y="76" font-size="28" font-weight="800" fill="url(#textGrad)" letter-spacing="-0.5" filter="url(#glow)">Free Claude Code Gateway</text>
+  <text x="118" y="100" font-size="14" fill="#94A3B8" letter-spacing="0.2">Universal Claude-Compatible AI Gateway · TypeScript · Node.js 20+</text>
+
+  <!-- Divider -->
+  <line x1="54" y1="118" x2="846" y2="118" stroke="#1E3A5F" stroke-width="1"/>
+
+  <!-- Feature badges row 1 -->
+  <rect x="54" y="134" width="148" height="28" rx="6" fill="#1E3A5F" stroke="#2563EB" stroke-width="1"/>
+  <text x="128" y="153" text-anchor="middle" font-size="11" fill="#60A5FA" font-weight="600">⚡ Claude Code Compatible</text>
+
+  <rect x="214" y="134" width="130" height="28" rx="6" fill="#1E1B4B" stroke="#7C3AED" stroke-width="1"/>
+  <text x="279" y="153" text-anchor="middle" font-size="11" fill="#A78BFA" font-weight="600">🔀 Smart Model Router</text>
+
+  <rect x="356" y="134" width="118" height="28" rx="6" fill="#052E16" stroke="#10B981" stroke-width="1.2"/>
+  <text x="415" y="153" text-anchor="middle" font-size="11" fill="#34D399" font-weight="600">📊 Admin Dashboard</text>
+
+  <rect x="486" y="134" width="120" height="28" rx="6" fill="#1C1917" stroke="#F59E0B" stroke-width="1"/>
+  <text x="546" y="153" text-anchor="middle" font-size="11" fill="#FCD34D" font-weight="600">🔄 Provider Failover</text>
+
+  <rect x="618" y="134" width="114" height="28" rx="6" fill="#0C0A09" stroke="#EF4444" stroke-width="1"/>
+  <text x="675" y="153" text-anchor="middle" font-size="11" fill="#FCA5A5" font-weight="600">🛡 Rate Limiting</text>
+
+  <rect x="744" y="134" width="102" height="28" rx="6" fill="#1E3A5F" stroke="#38BDF8" stroke-width="1"/>
+  <text x="795" y="153" text-anchor="middle" font-size="11" fill="#7DD3FC" font-weight="600">🐳 Docker Ready</text>
+
+  <!-- Provider line -->
+  <text x="54" y="194" font-size="11" fill="#64748B" font-weight="600" letter-spacing="0.5">WORKS WITH</text>
+
+  <rect x="54" y="204" width="80" height="26" rx="5" fill="#0F172A" stroke="#334155"/>
+  <text x="94" y="221" text-anchor="middle" font-size="10.5" fill="#E2E8F0" font-weight="600">🌙 Kimi</text>
+
+  <rect x="146" y="204" width="80" height="26" rx="5" fill="#0F172A" stroke="#334155"/>
+  <text x="186" y="221" text-anchor="middle" font-size="10.5" fill="#E2E8F0" font-weight="600">⚡ GLM</text>
+
+  <rect x="238" y="204" width="80" height="26" rx="5" fill="#0F172A" stroke="#334155"/>
+  <text x="278" y="221" text-anchor="middle" font-size="10.5" fill="#E2E8F0" font-weight="600">🔵 DeepSeek</text>
+
+  <rect x="330" y="204" width="80" height="26" rx="5" fill="#0F172A" stroke="#334155"/>
+  <text x="370" y="221" text-anchor="middle" font-size="10.5" fill="#E2E8F0" font-weight="600">🔀 OpenRouter</text>
+
+  <rect x="422" y="204" width="80" height="26" rx="5" fill="#0F172A" stroke="#334155"/>
+  <text x="462" y="221" text-anchor="middle" font-size="10.5" fill="#E2E8F0" font-weight="600">🤖 Mistral</text>
+
+  <rect x="514" y="204" width="80" height="26" rx="5" fill="#0F172A" stroke="#334155"/>
+  <text x="554" y="221" text-anchor="middle" font-size="10.5" fill="#E2E8F0" font-weight="600">🦙 Ollama</text>
+
+  <rect x="606" y="204" width="80" height="26" rx="5" fill="#0F172A" stroke="#334155"/>
+  <text x="646" y="221" text-anchor="middle" font-size="10.5" fill="#E2E8F0" font-weight="600">✨ Fireworks</text>
+
+  <rect x="698" y="204" width="148" height="26" rx="5" fill="#0F172A" stroke="#334155"/>
+  <text x="772" y="221" text-anchor="middle" font-size="10.5" fill="#64748B">+ any OpenAI-compatible</text>
+
+  <!-- Bottom tagline -->
+  <line x1="54" y1="248" x2="846" y2="248" stroke="#1E3A5F" stroke-width="1"/>
+  <text x="450" y="267" text-anchor="middle" font-size="11.5" fill="#475569">
+    <tspan font-weight="600" fill="#60A5FA">One Endpoint.</tspan>
+    <tspan fill="#64748B">  Any Provider.</tspan>
+    <tspan font-weight="600" fill="#A78BFA">  Claude Code Compatible.</tspan>
+    <tspan fill="#64748B">  MIT License.</tspan>
+  </text>
+</svg>
