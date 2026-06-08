@@ -1,19 +1,18 @@
 <div align="center">
 
-<img src="assets/banner.svg" alt="Free Claude Code Gateway" width="900"/>
+<img src="assets/banner.svg" alt="Free Claude Code — Use Claude Code for free with Kimi, GLM, DeepSeek" width="900"/>
 
-# Free Claude Code Gateway
+# Free Claude Code
 
-**Universal Claude-Compatible AI Gateway**
+**Use Claude Code for free — run it with Kimi, GLM, DeepSeek, OpenRouter and any OpenAI-compatible provider**
 
-Route Claude Code requests to Kimi, GLM, DeepSeek, OpenAI-compatible providers and other AI models through a single Claude-compatible endpoint.
+Run Claude Code without an Anthropic API key. Point it at any free or low-cost AI provider through a single Claude-compatible endpoint.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Express](https://img.shields.io/badge/Express-4.x-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
 [![Tests](https://img.shields.io/badge/Tests-Passing-10B981?style=for-the-badge)](https://github.com/rajakumar865465/Free-Claude-Code-Gateway/actions)
-[![CI](https://img.shields.io/github/actions/workflow/status/rajakumar865465/Free-Claude-Code-Gateway/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/rajakumar865465/Free-Claude-Code-Gateway/actions)
 
 [Quick Start](#-quick-start) · [Providers](#-supported-providers) · [Admin Dashboard](#-admin-dashboard) · [Client Setup](#-connect-your-tools) · [Running Locally](#-running-locally) · [API Reference](#-api-reference)
 
@@ -21,7 +20,20 @@ Route Claude Code requests to Kimi, GLM, DeepSeek, OpenAI-compatible providers a
 
 ---
 
-## What Is This?
+## Use Claude Code for Free
+
+**Free Claude Code Gateway** lets you use the Claude Code CLI, VS Code extensions (Cline, Roo Code), Continue.dev, and any Anthropic-compatible tool — without paying for an Anthropic API key. Instead, it routes your Claude Code requests to free or affordable AI providers like Kimi, GLM, DeepSeek, or OpenRouter.
+
+> **Free Claude Code · Claude Code without API key · Claude Code alternative · Claude Code proxy**
+
+This is a community-built open-source tool. It is **not** affiliated with Anthropic. If you can afford Claude Code, [please support Anthropic and buy it](https://claude.ai/download) — this project is for developers who cannot.
+
+```
+Claude Code CLI            Free Claude Code Gateway          Free/Cheap Provider
+Cline / Roo Code    ──▶    POST /v1/messages          ──▶    Kimi / GLM / DeepSeek
+Continue.dev               POST /v1/chat/completions          OpenRouter (free tier)
+Any Anthropic Client       Admin UI at /admin                 Any OpenAI-compatible API
+```
 
 Free Claude Code Gateway is an **open-source TypeScript proxy** that sits between Claude Code (and any Anthropic-compatible client) and your chosen AI provider. It accepts requests in the Anthropic Messages API format and converts them to OpenAI-compatible format before forwarding to any provider you configure — then converts the response back. Fully transparent.
 
@@ -31,10 +43,6 @@ Cline / Roo Code    ──▶    POST /v1/messages          ──▶    Kimi / 
 Continue.dev               POST /v1/chat/completions          OpenRouter / Mistral
 Any Anthropic Client       Admin UI at /admin                 Any OpenAI-compatible API
 ```
-
-> **One Endpoint. Any Provider. Claude Code Compatible.**
-
----
 
 ## ⚠️ Responsible Use & Legal Notice
 
