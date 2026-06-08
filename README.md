@@ -15,7 +15,7 @@ Route Claude Code requests to Kimi, GLM, DeepSeek, OpenAI-compatible providers a
 [![Tests](https://img.shields.io/badge/Tests-Passing-10B981?style=for-the-badge)](https://github.com/rajakumar865465/Free-Claude-Code-Gateway/actions)
 [![CI](https://img.shields.io/github/actions/workflow/status/rajakumar865465/Free-Claude-Code-Gateway/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/rajakumar865465/Free-Claude-Code-Gateway/actions)
 
-[Quick Start](#-quick-start) · [Providers](#-supported-providers) · [Admin Dashboard](#-admin-dashboard) · [Client Setup](#-connect-your-tools) · [Deploy](#-deployment) · [API Reference](#-api-reference)
+[Quick Start](#-quick-start) · [Providers](#-supported-providers) · [Admin Dashboard](#-admin-dashboard) · [Client Setup](#-connect-your-tools) · [Self-Hosting](#-self-hosting) · [API Reference](#-api-reference)
 
 </div>
 
@@ -33,6 +33,30 @@ Any Anthropic Client       Admin UI at /admin                 Any OpenAI-compati
 ```
 
 > **One Endpoint. Any Provider. Claude Code Compatible.**
+
+---
+
+## ⚠️ Responsible Use & Legal Notice
+
+This project is built **by the community, for the community** — specifically for developers who want to use the Claude Code interface with alternative AI providers they already have access to.
+
+**Please read before using:**
+
+- This gateway **does not bypass, crack, or circumvent** Anthropic's systems in any way. It is a standard API format converter — the same thing any OpenAI-compatible client library does.
+- You are responsible for complying with the terms of service of **both Anthropic and your chosen upstream provider**.
+- This project is **not affiliated with, endorsed by, or supported by Anthropic**.
+- We do **not** condone using this tool to abuse free tiers, violate provider rate limits, or circumvent usage policies.
+- If you use Claude Code professionally or can afford a subscription, **please support Anthropic by purchasing Claude Code** — it funds the research and engineering that makes Claude great.
+
+### 💙 Support Anthropic — Buy Claude Code
+
+If this gateway is useful to you and you can afford it, the right thing to do is support the people who built Claude:
+
+**→ [Get Claude Code (Official)](https://claude.ai/download)** — Anthropic's official Claude Code subscription
+
+**→ [Anthropic Pricing](https://www.anthropic.com/pricing)** — View all plans and options
+
+This project exists for students, hobbyists, developers in regions where pricing is prohibitive, and open-source contributors who want to experiment with Claude-compatible tooling using providers they already pay for. It is **not** a way to get Claude for free — you are using a different AI model from a different provider. The Claude Code interface is just the client.
 
 ---
 
@@ -383,7 +407,7 @@ All settings except `BLUESMINDS_API_KEY` and `BLUESMINDS_BASE_URL` can also be u
 
 ---
 
-## 🚢 Deployment
+## 🏠 Self-Hosting
 
 ### Docker
 
@@ -558,12 +582,18 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 MIT — see [LICENSE](LICENSE) for details.
 
+This software is provided as-is for educational and personal use. The authors are not responsible for how it is used. Always comply with the terms of service of any AI provider you connect to this gateway.
+
 ---
 
 <div align="center">
 
-**Built for developers who want Claude Code's power with the provider of their choice.**
+**Built with ❤️ by the open-source community.**
 
-[⭐ Star this repo](https://github.com/rajakumar865465/Free-Claude-Code-Gateway) · [🐛 Report a Bug](https://github.com/rajakumar865465/Free-Claude-Code-Gateway/issues/new?template=bug_report.md) · [💡 Request a Feature](https://github.com/rajakumar865465/Free-Claude-Code-Gateway/issues/new?template=feature_request.md)
+**If Claude Code works well for you — [please support Anthropic and buy a subscription](https://claude.ai/download). It's the right thing to do.**
+
+[⭐ Star this repo](https://github.com/rajakumar865465/Free-Claude-Code-Gateway) · [🐛 Report a Bug](https://github.com/rajakumar865465/Free-Claude-Code-Gateway/issues/new?template=bug_report.md) · [💡 Request a Feature](https://github.com/rajakumar865465/Free-Claude-Code-Gateway/issues/new?template=feature_request.md) · [💙 Buy Claude Code](https://claude.ai/download)
+
+*This project is not affiliated with or endorsed by Anthropic. Claude® is a trademark of Anthropic, PBC.*
 
 </div>
