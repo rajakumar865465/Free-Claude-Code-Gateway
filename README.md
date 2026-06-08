@@ -15,7 +15,7 @@ Route Claude Code requests to Kimi, GLM, DeepSeek, OpenAI-compatible providers a
 [![Tests](https://img.shields.io/badge/Tests-Passing-10B981?style=for-the-badge)](https://github.com/rajakumar865465/Free-Claude-Code-Gateway/actions)
 [![CI](https://img.shields.io/github/actions/workflow/status/rajakumar865465/Free-Claude-Code-Gateway/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/rajakumar865465/Free-Claude-Code-Gateway/actions)
 
-[Quick Start](#-quick-start) · [Providers](#-supported-providers) · [Admin Dashboard](#-admin-dashboard) · [Client Setup](#-connect-your-tools) · [Self-Hosting](#-self-hosting) · [API Reference](#-api-reference)
+[Quick Start](#-quick-start) · [Providers](#-supported-providers) · [Admin Dashboard](#-admin-dashboard) · [Client Setup](#-connect-your-tools) · [Running Locally](#-running-locally) · [API Reference](#-api-reference)
 
 </div>
 
@@ -407,66 +407,29 @@ All settings except `BLUESMINDS_API_KEY` and `BLUESMINDS_BASE_URL` can also be u
 
 ---
 
-## 🏠 Self-Hosting
+## 🏠 Running Locally
 
-### Docker
+This is a local tool — just run it on your machine and point Claude Code at it.
 
-```bash
-docker build -t fcc-gateway .
-docker run -p 8787:8787 --env-file .env fcc-gateway
-```
-
-### Docker Compose
+### Node.js (recommended)
 
 ```bash
-docker compose up -d --build
+npm run dev        # Start with live reload (development)
 ```
-
-Includes a named volume for persistent data:
-
-```yaml
-volumes:
-  - fcc-gateway-data:/app/.blueclaude-data
-```
-
-### PM2
 
 ```bash
-npm run build
-pm2 start ecosystem.config.cjs
-pm2 save && pm2 startup
+npm run build      # Compile TypeScript once
+npm start          # Run the compiled version
 ```
 
-The PM2 app name is `fcc-gateway`. The Admin Dashboard **Restart Gateway** button triggers `pm2 restart fcc-gateway`.
+The gateway runs at `http://localhost:8787`. That's it.
 
-### Nginx Reverse Proxy
+### Docker (optional)
 
-```nginx
-server {
-    listen 80;
-    server_name proxy.yourdomain.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:8787;
-        proxy_set_header Host $host;
-        proxy_buffering off;
-    }
-
-    # Extended timeout for streaming AI responses
-    location ~ ^/(v1/messages|admin/api/events) {
-        proxy_pass http://127.0.0.1:8787;
-        proxy_read_timeout 600s;
-        proxy_buffering off;
-    }
-}
-```
-
-Full config at [`deploy/nginx/blueclaude-proxy.conf`](deploy/nginx/blueclaude-proxy.conf).
-
-Add HTTPS:
+If you prefer containers:
 
 ```bash
-sudo certbot --nginx -d proxy.yourdomain.com
+docker compose up --build
 ```
 
 ---
