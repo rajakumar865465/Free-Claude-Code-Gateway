@@ -23,7 +23,7 @@ Route Claude Code requests to Kimi, GLM, DeepSeek, OpenAI-compatible providers a
 
 ## What Is This?
 
-Free Claude Code Gateway is a **production-ready TypeScript proxy** that sits between Claude Code (and any Anthropic-compatible client) and your chosen AI provider. It accepts requests in the Anthropic Messages API format and converts them to OpenAI-compatible format before forwarding to any provider you configure — then converts the response back. Fully transparent.
+Free Claude Code Gateway is an **open-source TypeScript proxy** that sits between Claude Code (and any Anthropic-compatible client) and your chosen AI provider. It accepts requests in the Anthropic Messages API format and converts them to OpenAI-compatible format before forwarding to any provider you configure — then converts the response back. Fully transparent.
 
 ```
 Claude Code CLI            Free Claude Code Gateway          Your Provider
@@ -55,7 +55,7 @@ Any Anthropic Client       Admin UI at /admin                 Any OpenAI-compati
 - **Admin Dashboard** — Full SPA at `/admin` with real-time analytics, request monitoring, model router management, playground, and diagnostics.
 - **Data Persistence** — Request history, config overrides, and model mappings survive restarts.
 - **Runtime Config** — Update provider URL, API key, rate limits, and timeouts from the Admin UI without restarting.
-- **Production Ready** — Docker, Docker Compose, PM2, and Nginx configs included.
+- **Easy to Deploy** — Docker, Docker Compose, PM2, and Nginx configs included.
 - **Safe Logging** — API keys and auth headers always redacted. Zero sensitive data in logs.
 
 ---
