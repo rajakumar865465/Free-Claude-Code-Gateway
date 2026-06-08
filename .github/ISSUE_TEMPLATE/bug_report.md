@@ -23,7 +23,7 @@ What actually happened. Include the full error message/stack trace.
 ## Configuration
 - **Provider / Base URL:** (e.g. `https://api.moonshot.cn/v1`)
 - **Model mapping in use:** (paste from `/admin/api/models/mappings`)
-- **Client model requested:** (e.g. `claude-3-5-sonnet-20241022`)
+- **Client model requested:** (e.g. `claude-opus-4-5-20251101`)
 - **Resolved model:** (shown in admin dashboard or logs)
 - **Gateway version:** (from `/health` endpoint)
 

@@ -195,7 +195,7 @@
   <text x="440" y="437" font-size="9" fill="#64748B" font-weight="700">→</text>
   <text x="460" y="437" font-size="9" fill="#64748B" font-weight="700">PROVIDER MODEL</text>
   <text x="624" y="437" font-size="9" fill="#64748B" font-weight="700">STATUS</text>
-  <text x="226" y="456" font-size="9.5" fill="#1D4ED8" font-family="monospace">claude-3-5-sonnet-20241022</text>
+  <text x="226" y="456" font-size="9.5" fill="#1D4ED8" font-family="monospace">claude-opus-4-5-20251101</text>
   <text x="440" y="456" font-size="9" fill="#64748B">→</text>
   <text x="460" y="456" font-size="9.5" fill="#0F172A" font-family="monospace">z-ai/glm-5.1</text>
   <rect x="622" y="447" width="40" height="14" rx="7" fill="#DCFCE7"/>

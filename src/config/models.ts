@@ -16,7 +16,7 @@ export const DEFAULT_FAMILY_RULES: FamilyRule[] = [
 
 const DEFAULT_CONFIG: ModelMappingConfig = {
   anthropic_to_bluesminds: {
-    'claude-3-5-sonnet-20241022': 'z-ai/glm-5.1',
+    'claude-opus-4-5-20251101': 'z-ai/glm-5.1',
     'claude-3-5-sonnet-latest':   'z-ai/glm-5.1',
     'claude-3-7-sonnet-20250219': 'z-ai/glm-5.1',
     'claude-sonnet-4-20250514':   'z-ai/glm-5.1',

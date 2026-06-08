@@ -1285,7 +1285,7 @@
   }
 
   function copyCurlToClipboard(label = 'cURL') {
-    const curl = `curl -X POST ${getProxyBase()}/v1/messages \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"claude-3-5-sonnet-20241022","max_tokens":1024,"messages":[{"role":"user","content":"Hello"}]}'`;
+    const curl = `curl -X POST ${getProxyBase()}/v1/messages \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"claude-opus-4-5-20251101","max_tokens":1024,"messages":[{"role":"user","content":"Hello"}]}'`;
     navigator.clipboard?.writeText(curl).then(
       () => toast(`${label} copied to clipboard`, 'ok', 'Copied'),
       () => toast('Copy failed', 'error', 'Error')
@@ -2450,7 +2450,7 @@
      ══════════════════════════════════════════════════════════════════ */
 
   const RECOMMENDED_MAPPINGS = [
-    { claude: 'claude-3-5-sonnet-20241022', provider: 'moonshotai/kimi-k2.6' },
+    { claude: 'claude-opus-4-5-20251101', provider: 'moonshotai/kimi-k2.6' },
     { claude: 'claude-haiku-4-5-20251001', provider: 'gpt-5-nano' },
   ];
 
@@ -2511,7 +2511,7 @@
       return `<tr class="mapping-row ${selected}" data-key="${escapeAttr(k)}">
         <td>
           <div class="mapping-input-cell">
-            <input class="mapping-input ${isDirty ? 'is-dirty' : ''}" data-field="key" data-original="${escapeAttr(k)}" value="${escapeAttr(k)}" placeholder="claude-3-5-sonnet-20241022" />
+            <input class="mapping-input ${isDirty ? 'is-dirty' : ''}" data-field="key" data-original="${escapeAttr(k)}" value="${escapeAttr(k)}" placeholder="claude-opus-4-5-20251101" />
           </div>
         </td>
         <td><span class="mapping-provider-badge">upstream</span></td>
@@ -3836,7 +3836,7 @@
 
   function getShellText(tool, shell) {
     const base = getProxyBase();
-    const model = state.lastConfig?.defaultModel || 'claude-3-5-sonnet-20241022';
+    const model = state.lastConfig?.defaultModel || 'claude-opus-4-5-20251101';
     const url = base;
     if (tool === 'claude-code') {
       if (shell === 'cmd') return `set ANTHROPIC_BASE_URL=${url}\r\nset ANTHROPIC_AUTH_TOKEN=local-proxy-key\r\nset ANTHROPIC_MODEL=${model}\r\nclaude`;
@@ -3869,7 +3869,7 @@
     const text = getShellText(_activeTool, state.configShell);
     cfgPre.textContent = text;
     if (cfgBaseUrl) cfgBaseUrl.textContent = getProxyBase();
-    if (cfgModel) cfgModel.textContent = state.lastConfig?.defaultModel || 'claude-3-5-sonnet-20241022';
+    if (cfgModel) cfgModel.textContent = state.lastConfig?.defaultModel || 'claude-opus-4-5-20251101';
   }
 
   function openCopyConfigPanel(tool) {
@@ -3945,7 +3945,7 @@
       const base = getProxyBase();
       let curl;
       if (latest.endpoint && latest.endpoint.includes('/v1/messages')) {
-        const body = { model: latest.clientModel || latest.resolvedModel || 'claude-3-5-sonnet-20241022', max_tokens: 1024, messages: [{ role: 'user', content: 'Hello' }] };
+        const body = { model: latest.clientModel || latest.resolvedModel || 'claude-opus-4-5-20251101', max_tokens: 1024, messages: [{ role: 'user', content: 'Hello' }] };
         curl = `curl -X POST ${base}${latest.endpoint} \\\n  -H "Content-Type: application/json" \\\n  -d '${JSON.stringify(body)}'`;
       } else {
         const body = { model: latest.clientModel || latest.resolvedModel || 'gpt-4', messages: [{ role: 'user', content: 'Hello' }] };

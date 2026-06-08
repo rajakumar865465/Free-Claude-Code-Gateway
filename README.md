@@ -134,7 +134,7 @@ Edit `config/models.json` to map Claude model names to your provider's models:
 ```json
 {
   "anthropic_to_bluesminds": {
-    "claude-3-5-sonnet-20241022": "moonshotai/kimi-k2",
+    "claude-opus-4-5-20251101": "moonshotai/kimi-k2",
     "claude-3-5-sonnet-latest":   "moonshotai/kimi-k2",
     "claude-opus-4-20250514":     "moonshotai/kimi-k2",
     "claude-haiku-4-20250514":    "moonshotai/kimi-k2"
@@ -210,7 +210,7 @@ Point any of these at `http://localhost:8787` with any API key value:
 # Linux / macOS
 export ANTHROPIC_BASE_URL=http://localhost:8787
 export ANTHROPIC_AUTH_TOKEN=any-value
-export ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+export ANTHROPIC_MODEL=claude-opus-4-5-20251101
 claude
 ```
 
@@ -218,7 +218,7 @@ claude
 # Windows PowerShell
 $env:ANTHROPIC_BASE_URL   = "http://localhost:8787"
 $env:ANTHROPIC_AUTH_TOKEN = "any-value"
-$env:ANTHROPIC_MODEL      = "claude-3-5-sonnet-20241022"
+$env:ANTHROPIC_MODEL      = "claude-opus-4-5-20251101"
 claude
 ```
 
@@ -229,7 +229,7 @@ Or add to `~/.claude.json` / `.claude.json` in your project:
   "env": {
     "ANTHROPIC_BASE_URL": "http://localhost:8787",
     "ANTHROPIC_AUTH_TOKEN": "any-value",
-    "ANTHROPIC_MODEL": "claude-3-5-sonnet-20241022"
+    "ANTHROPIC_MODEL": "claude-opus-4-5-20251101"
   }
 }
 ```
@@ -241,7 +241,7 @@ Or add to `~/.claude.json` / `.claude.json` in your project:
 | API Provider | `Anthropic` |
 | Base URL | `http://localhost:8787` |
 | API Key | any value (or your `PROXY_API_KEY` if set) |
-| Model | `claude-3-5-sonnet-20241022` |
+| Model | `claude-opus-4-5-20251101` |
 
 ### Continue.dev
 
@@ -250,7 +250,7 @@ Or add to `~/.claude.json` / `.claude.json` in your project:
   "models": [{
     "title": "Free Claude Code Gateway",
     "provider": "anthropic",
-    "model": "claude-3-5-sonnet-20241022",
+    "model": "claude-opus-4-5-20251101",
     "apiBase": "http://localhost:8787",
     "apiKey": "any-value"
   }]
@@ -262,7 +262,7 @@ Or add to `~/.claude.json` / `.claude.json` in your project:
 ```bash
 export ANTHROPIC_API_BASE=http://localhost:8787
 export ANTHROPIC_API_KEY=any-value
-aider --model claude-3-5-sonnet-20241022
+aider --model claude-opus-4-5-20251101
 ```
 
 ### OpenAI-style clients (LibreChat, Open WebUI, LobeChat)
@@ -303,7 +303,7 @@ curl http://localhost:8787/v1/messages \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer any-value" \
   -d '{
-    "model": "claude-3-5-sonnet-20241022",
+    "model": "claude-opus-4-5-20251101",
     "max_tokens": 1024,
     "messages": [{ "role": "user", "content": "Write a quicksort in TypeScript." }]
   }'

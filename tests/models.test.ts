@@ -20,8 +20,8 @@ describe('model mapping', () => {
     process.env.MODELS_CONFIG_PATH = path.sep + 'definitely' + path.sep + 'missing' + path.sep + 'models.json';
     resetModelConfigCache();
     const cfg = loadModelConfig();
-    const resolved = resolveProviderModel('claude-3-5-sonnet-20241022', cfg, 'gpt-4.1', false);
-    assert.equal(resolved, cfg.anthropic_to_bluesminds['claude-3-5-sonnet-20241022']);
+    const resolved = resolveProviderModel('claude-opus-4-5-20251101', cfg, 'gpt-4.1', false);
+    assert.equal(resolved, cfg.anthropic_to_bluesminds['claude-opus-4-5-20251101']);
   });
 
   it('falls back to incoming model in non-strict mode when no family rules match', () => {
@@ -45,7 +45,7 @@ describe('model mapping', () => {
   it('throws in strict mode when model has no exact mapping (family rules are bypassed in strict)', () => {
     // In strict mode, family rule wildcards are NOT consulted — exact match only
     const cfg = {
-      anthropic_to_bluesminds: { 'claude-3-5-sonnet-20241022': 'z-ai/glm-5.1' },
+      anthropic_to_bluesminds: { 'claude-opus-4-5-20251101': 'z-ai/glm-5.1' },
       default: 'z-ai/glm-5.1',
       family_rules: [],
     };
