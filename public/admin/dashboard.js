@@ -115,6 +115,10 @@
     pgRunning: false,
     sparkReqHistory: [],
     unsavedChanges: false,
+    suggestions: [],
+    defaultSuggestion: null,
+    availableModelsCachedAt: null,
+    prefixStyle: null,
     configShell: 'bash',
   };
 
@@ -2459,13 +2463,15 @@
     const inSaved = originalKey in state.savedMappings;
     if (!inSaved) return 'unsaved';
     if (savedValue !== currentValue) return 'unsaved';
+    const suggestion = state.suggestions.find((s) => s.claudeModel === originalKey);
+    if (suggestion && !suggestion.alreadyCorrect) return 'suggested';
     if (state.testedMappings[originalKey]) return 'tested';
     if (state.failedMappings[originalKey]) return 'failed';
     return 'exact';
   }
 
   function mappingStatusLabel(status) {
-    return ({ exact: 'Exact', unsaved: 'Unsaved', tested: 'Tested', failed: 'Failed', fallback: 'Fallback' })[status] || 'Exact';
+    return ({ exact: 'Exact', unsaved: 'Unsaved', suggested: 'Suggested', tested: 'Tested', failed: 'Failed', fallback: 'Fallback' })[status] || 'Exact';
   }
 
   async function loadMappings() {
@@ -2507,6 +2513,14 @@
     tbody.innerHTML = entries.map(([k, v]) => {
       const status = getMappingStatus(k, v);
       const isDirty = status === 'unsaved';
+      const suggestion = state.suggestions.find((s) => s.claudeModel === k);
+      const hasSuggestion = suggestion && !suggestion.alreadyCorrect;
+      const isAlreadyCorrect = suggestion && suggestion.alreadyCorrect;
+      const badgeHtml = hasSuggestion
+        ? `<span class="suggestion-badge" data-suggest="${escapeAttr(suggestion.suggested)}" title="${escapeAttr(suggestion.reason)} (${(suggestion.confidence * 100).toFixed(0)}% confidence) — click to apply">→ ${escapeHtml(suggestion.suggested)}</span>`
+        : isAlreadyCorrect
+          ? `<span class="suggestion-badge correct" title="Already using the correct provider ID">✓ Correct</span>`
+          : '';
       const selected = state.selectedMapping === k ? 'is-selected' : '';
       return `<tr class="mapping-row ${selected}" data-key="${escapeAttr(k)}">
         <td>
@@ -2517,7 +2531,8 @@
         <td><span class="mapping-provider-badge">upstream</span></td>
         <td>
           <div class="mapping-input-cell">
-            <input class="mapping-input ${isDirty ? 'is-dirty' : ''}" data-field="val" data-original="${escapeAttr(k)}" value="${escapeAttr(v)}" placeholder="moonshotai/kimi-k2.6" />
+            <input class="mapping-input ${isDirty ? 'is-dirty' : ''}" data-field="val" data-original="${escapeAttr(k)}" value="${escapeAttr(v)}" placeholder="moonshotai/kimi-k2.6" list="provider-models-list" />
+            ${badgeHtml}
           </div>
         </td>
         <td><span class="mapping-status status-${status}">${mappingStatusLabel(status)}</span></td>
@@ -2575,6 +2590,18 @@
       });
     });
 
+    /* Wire suggestion badge clicks — fill input with suggested value */
+    tbody.querySelectorAll('.suggestion-badge[data-suggest]').forEach((badge) => {
+      badge.addEventListener('click', () => {
+        const suggested = badge.getAttribute('data-suggest');
+        const valInput = badge.closest('.mapping-input-cell')?.querySelector('input[data-field="val"]');
+        if (valInput && suggested) {
+          valInput.value = suggested;
+          valInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+    });
+
     /* Wire row selection */
     tbody.querySelectorAll('tr.mapping-row').forEach((tr) => {
       tr.addEventListener('click', (ev) => {
@@ -2589,6 +2616,103 @@
   function selectMappingRow(key) {
     state.selectedMapping = state.selectedMapping === key ? null : key;
     renderMappingsTable();
+  }
+
+  function updateAutoMapButton() {
+    const btn = $('#auto-map-btn');
+    if (!btn) return;
+    const hasModels = state.availableModels.length > 0;
+    btn.disabled = !hasModels;
+    btn.title = hasModels
+      ? 'Suggest provider model IDs based on the synced model list'
+      : 'Sync Models first to enable Auto-Map';
+  }
+
+  function renderApplySuggestionsBar() {
+    const existing = $('#apply-suggestions-bar');
+    if (existing) existing.remove();
+
+    const pending = (state.suggestions || []).filter((s) => !s.alreadyCorrect);
+    if (pending.length === 0) return;
+
+    const bar = document.createElement('div');
+    bar.id = 'apply-suggestions-bar';
+    bar.className = 'apply-suggestions-bar stagger-item';
+    bar.innerHTML = `
+      <span class="apply-suggestions-text">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <strong>${pending.length} suggestion${pending.length === 1 ? '' : 's'}</strong> ready — click to apply all at once
+        ${state.prefixStyle === 'mixed' ? '<span class="badge badge-warning" style="margin-left:8px">Mixed prefixes</span>' : ''}
+      </span>
+      <div class="apply-suggestions-actions">
+        <button class="btn btn-primary btn-sm" id="apply-all-btn" type="button">Apply ${pending.length} suggestion${pending.length === 1 ? '' : 's'}</button>
+        <button class="btn btn-ghost btn-sm" id="dismiss-suggestions-btn" type="button">Dismiss</button>
+      </div>
+    `;
+
+    const panel = $('.router-mappings-panel');
+    const tableWrap = panel?.querySelector('.table-wrap');
+    if (panel && tableWrap) panel.insertBefore(bar, tableWrap);
+
+    $('#apply-all-btn')?.addEventListener('click', async () => {
+      const applyBtn = $('#apply-all-btn');
+      if (applyBtn) applyBtn.classList.add('btn-loading');
+      try {
+        const updated = await api('POST', '/models/apply-suggestions', { acceptAll: true });
+        state.mappings = updated.mappings || {};
+        state.savedMappings = { ...(updated.mappings || {}) };
+        state.defaultModel = updated.default || '';
+        state.suggestions = [];
+        state.defaultSuggestion = null;
+        const defaultInput = $('#default-model-input');
+        if (defaultInput) defaultInput.value = state.defaultModel;
+        renderMappingsTable();
+        renderApplySuggestionsBar();
+        renderRouterHealth();
+        toast(`${pending.length} mapping${pending.length === 1 ? '' : 's'} updated`, 'ok', 'Applied');
+      } catch (err) {
+        toast(err.message, 'error', 'Apply failed');
+      } finally {
+        if (applyBtn) applyBtn.classList.remove('btn-loading');
+      }
+    });
+
+    $('#dismiss-suggestions-btn')?.addEventListener('click', () => {
+      state.suggestions = [];
+      state.defaultSuggestion = null;
+      renderApplySuggestionsBar();
+      renderMappingsTable();
+      toast('Suggestions dismissed', 'info', 'Dismissed');
+    });
+  }
+
+  async function runAutoMap() {
+    const btn = $('#auto-map-btn');
+    if (btn) btn.classList.add('btn-loading');
+    try {
+      const data = await api('POST', '/models/auto-map');
+      state.suggestions = data.suggestions || [];
+      state.defaultSuggestion = data.defaultSuggestion || null;
+      state.prefixStyle = data.prefixStyle || null;
+
+      if (data.mixedWarning) {
+        toast(data.mixedWarning, 'warn', 'Mixed prefix styles detected');
+      }
+
+      renderMappingsTable();
+      renderApplySuggestionsBar();
+
+      const pending = state.suggestions.filter((s) => !s.alreadyCorrect).length;
+      const correct = state.suggestions.filter((s) => s.alreadyCorrect).length;
+      const msg = pending > 0
+        ? `${pending} suggestion${pending === 1 ? '' : 's'} found${correct > 0 ? `, ${correct} already correct` : ''}`
+        : `All ${correct} mapping${correct === 1 ? '' : 's'} already use correct IDs`;
+      toast(msg, pending > 0 ? 'ok' : 'info', 'Auto-Map complete');
+    } catch (err) {
+      toast(err.message, 'error', 'Auto-Map failed');
+    } finally {
+      if (btn) btn.classList.remove('btn-loading');
+    }
   }
 
   function updateSelectedMappingLabel() {
@@ -2884,7 +3008,22 @@
     const label = $('#available-count-label');
     if (!body) return;
     const all = state.availableModels || [];
-    if (label) label.textContent = `${all.length} synced from provider`;
+    const staleLabel = (() => {
+      if (!state.availableModelsCachedAt) return '';
+      const ageMs = Date.now() - new Date(state.availableModelsCachedAt).getTime();
+      const mins = Math.floor(ageMs / 60000);
+      const hours = Math.floor(mins / 60);
+      if (hours >= 1) return ` — synced ${hours}h ago`;
+      if (mins >= 1) return ` — synced ${mins}m ago`;
+      return ' — just synced';
+    })();
+    if (label) label.textContent = `${all.length} synced${staleLabel}`;
+
+    /* Populate autocomplete datalist for Provider Model inputs */
+    const dl = document.getElementById('provider-models-list');
+    if (dl) {
+      dl.innerHTML = all.slice(0, 300).map((id) => `<option value="${escapeAttr(id)}"></option>`).join('');
+    }
 
     if (all.length === 0) {
       body.innerHTML = `<div class="router-available-empty">
@@ -3069,7 +3208,10 @@
         state.mappings = updated.mappings || {};
         state.savedMappings = { ...(updated.mappings || {}) };
         state.defaultModel = updated.default || '';
+        state.suggestions = [];
+        state.defaultSuggestion = null;
         renderMappingsTable();
+        renderApplySuggestionsBar();
         renderRouterHealth();
         renderFamilyRules();
         renderAutoFallback();
@@ -3156,6 +3298,14 @@
     });
   }
 
+  /* ── Auto-Map button ─────────────────────────────────────────── */
+  const autoMapBtn = $('#auto-map-btn');
+  if (autoMapBtn) {
+    autoMapBtn.addEventListener('click', () => {
+      if (state.availableModels.length > 0) runAutoMap();
+    });
+  }
+
   /* ── Fetch available models ──────────────────────────────────────── */
   const refreshAvailableBtn = $('#refresh-available');
   if (refreshAvailableBtn) {
@@ -3170,8 +3320,12 @@
       try {
         const data = await api('GET', '/models/available');
         state.availableModels = data.models || [];
+        state.availableModelsCachedAt = data.syncedAt || null;
+        state.suggestions = [];
+        state.defaultSuggestion = null;
         renderAvailableModels();
         renderSetupChecklist();
+        updateAutoMapButton();
       } catch (err) {
         errEl.textContent = err.message;
         list.innerHTML = '<div class="router-section-empty"><span class="router-section-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span>Sync failed. Check provider connection.</div>';

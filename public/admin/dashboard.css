@@ -2468,3 +2468,51 @@ kbd {
   .panel { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
   body { background: #fff; }
 }
+
+/* ── Auto-Map: Suggestion badge in mapping rows ────────────────── */
+.suggestion-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: var(--radius-pill);
+  font-size: 11px; font-weight: 600;
+  background: var(--warn-soft); color: var(--warn-text);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  cursor: pointer; margin-left: 6px;
+  transition: background var(--ease-fast);
+  white-space: nowrap; max-width: 200px;
+  overflow: hidden; text-overflow: ellipsis;
+  vertical-align: middle;
+}
+.suggestion-badge:hover { background: var(--warn-soft-strong); }
+.suggestion-badge.correct {
+  background: var(--ok-soft); color: var(--ok-text);
+  border-color: rgba(16, 185, 129, 0.3);
+  cursor: default;
+}
+
+/* ── Auto-Map: Mapping status — suggested ───────────────────────── */
+.mapping-status.status-suggested {
+  color: var(--warn-text);
+  background: var(--warn-soft);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-pill); padding: 2px 8px;
+  font-size: 11px; font-weight: 600;
+  display: inline-flex; align-items: center;
+}
+
+/* ── Auto-Map: Apply suggestions bar ───────────────────────────── */
+.apply-suggestions-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 14px;
+  background: var(--primary-soft);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.apply-suggestions-text {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--primary); font-weight: 500;
+}
+.apply-suggestions-actions {
+  display: flex; gap: 8px; align-items: center;
+}

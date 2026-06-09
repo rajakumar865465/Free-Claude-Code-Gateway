@@ -694,6 +694,10 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
                 Sync Models
               </button>
+              <button id="auto-map-btn" class="btn btn-outline" type="button" disabled title="Sync Models first to enable Auto-Map">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                Auto-Map
+              </button>
               <button id="export-mappings" class="btn btn-outline" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export
@@ -713,7 +717,7 @@
             <div class="form-grid" style="max-width:480px">
               <label>
                 <span>Provider Model</span>
-                <input id="default-model-input" class="mapping-input" type="text" placeholder="e.g. moonshotai/kimi-k2.6" />
+                <input id="default-model-input" class="mapping-input" type="text" list="provider-models-list" placeholder="e.g. moonshotai/kimi-k2.6" />
                 <small class="help-text">Used when no specific mapping matches the incoming Claude model name.</small>
               </label>
             </div>
@@ -1355,6 +1359,7 @@
     </div>
   </div>
 
+  <datalist id="provider-models-list"></datalist>
   <script src="/admin/assets/dashboard.js" defer></script>
 </body>
 </html>

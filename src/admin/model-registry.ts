@@ -6,6 +6,8 @@ import {
 } from '../config/models';
 import type { FamilyRule, ModelMappingConfig } from '../types/config';
 import { loadJson, saveJson } from './persist';
+import { buildSuggestions, computePrefixStyle, scoreMatch, CONFIDENCE_THRESHOLD } from './model-matcher';
+import type { AutoMapSuggestion, AutoMapResult } from '../types/config';
 
 export interface ModelMappingsPayload {
   mappings: Record<string, string>;
@@ -32,6 +34,10 @@ export class ModelRegistry {
   private overrideMappings: Record<string, string> | null = null;
   private overrideDefault: string | null = null;
   private overrideFamilyRules: FamilyRule[] | null = null;
+  private cachedAvailableModels: string[] = [];
+  private cachedAvailableAt: Date | null = null;
+  private cachedSuggestions: AutoMapSuggestion[] = [];
+  private cachedDefaultSuggestion: AutoMapSuggestion | null = null;
 
   constructor() {
     const stored = loadJson<StoredRegistry>(STORAGE_KEY, {});
@@ -158,6 +164,103 @@ export class ModelRegistry {
     this.overrideDefault = model.trim();
     this.persist();
     resetModelConfigCache();
+    return this.snapshot();
+  }
+
+  // ── Cached model list from provider sync ─────────────────────────────────
+
+  setCachedModels(models: string[]): void {
+    this.cachedAvailableModels = models;
+    this.cachedAvailableAt = new Date();
+    this.cachedSuggestions = [];
+    this.cachedDefaultSuggestion = null;
+  }
+
+  getCachedModels(): { models: string[]; cachedAt: Date | null } {
+    return {
+      models: this.cachedAvailableModels,
+      cachedAt: this.cachedAvailableAt,
+    };
+  }
+
+  computeAutoMap(defaultModel: string): AutoMapResult {
+    if (this.cachedAvailableModels.length === 0) {
+      throw new Error('No models synced. Run Sync Models first.');
+    }
+
+    const snap = this.snapshot();
+    const prefixStyle = computePrefixStyle(this.cachedAvailableModels);
+    const suggestions = buildSuggestions(snap.mappings, this.cachedAvailableModels);
+
+    let defaultSuggestion: AutoMapSuggestion | null = null;
+    if (defaultModel) {
+      let bestScore = 0;
+      let bestRaw = '';
+      let bestReason = '';
+      for (const rawId of this.cachedAvailableModels) {
+        const { score, reason } = scoreMatch(defaultModel, rawId);
+        if (score > bestScore) {
+          bestScore = score;
+          bestRaw = rawId;
+          bestReason = reason;
+        }
+      }
+      if (bestScore >= CONFIDENCE_THRESHOLD) {
+        defaultSuggestion = {
+          claudeModel: '__default__',
+          current: defaultModel,
+          suggested: bestRaw,
+          confidence: bestScore,
+          reason: bestReason,
+          alreadyCorrect: defaultModel === bestRaw,
+        };
+      }
+    }
+
+    this.cachedSuggestions = suggestions;
+    this.cachedDefaultSuggestion = defaultSuggestion;
+
+    const result: AutoMapResult = {
+      suggestions,
+      defaultSuggestion,
+      prefixStyle,
+      cachedAt: this.cachedAvailableAt,
+    };
+
+    if (prefixStyle === 'mixed') {
+      result.mixedWarning = 'This provider returns both prefixed and bare model IDs. Review suggestions carefully.';
+    }
+
+    return result;
+  }
+
+  applySuggestions(accept: string[] | 'all', defaultModel: string): ModelMappingsPayload {
+    if (this.cachedSuggestions.length === 0) {
+      throw new ModelRegistryValidationError('No cached suggestions. Run Auto-Map first.');
+    }
+
+    const toApply = accept === 'all'
+      ? this.cachedSuggestions
+      : this.cachedSuggestions.filter((s) => (accept as string[]).includes(s.claudeModel));
+
+    const snap = this.snapshot();
+    const newMappings: Record<string, string> = { ...snap.mappings };
+
+    for (const s of toApply) {
+      newMappings[s.claudeModel] = s.suggested;
+    }
+
+    this.overrideMappings = newMappings;
+
+    if (accept === 'all' && this.cachedDefaultSuggestion && !this.cachedDefaultSuggestion.alreadyCorrect) {
+      this.overrideDefault = this.cachedDefaultSuggestion.suggested;
+    }
+
+    this.persist();
+    resetModelConfigCache();
+    this.cachedSuggestions = [];
+    this.cachedDefaultSuggestion = null;
+
     return this.snapshot();
   }
 

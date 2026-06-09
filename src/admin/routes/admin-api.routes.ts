@@ -257,6 +257,52 @@ export function buildAdminApiRouter(state: AdminState): Router {
     }
   });
 
+  // POST /admin/api/models/auto-map — compute suggestions from cached model list
+  router.post('/models/auto-map', (_req: Request, res: Response) => {
+    try {
+      const defaultModel = state.configManager.getDefaultModel();
+      const result = state.modelRegistry.computeAutoMap(defaultModel);
+      res.json(result);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('No models synced')) {
+        res.status(400).json({
+          type: 'error',
+          error: { type: 'invalid_request_error', message: err.message },
+        });
+        return;
+      }
+      logger.error({ err }, 'auto_map_failed');
+      res.status(500).json({
+        type: 'error',
+        error: { type: 'api_error', message: 'Auto-map failed.' },
+      });
+    }
+  });
+
+  // POST /admin/api/models/apply-suggestions — apply cached suggestions
+  router.post('/models/apply-suggestions', (req: Request, res: Response) => {
+    try {
+      const body = req.body as { acceptAll?: boolean; accept?: string[] };
+      const accept: string[] | 'all' = body.acceptAll === true ? 'all' : (body.accept ?? []);
+      const defaultModel = state.configManager.getDefaultModel();
+      const updated = state.modelRegistry.applySuggestions(accept, defaultModel);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof ModelRegistryValidationError) {
+        res.status(400).json({
+          type: 'error',
+          error: { type: 'invalid_request_error', message: (err as Error).message },
+        });
+        return;
+      }
+      logger.error({ err }, 'apply_suggestions_failed');
+      res.status(500).json({
+        type: 'error',
+        error: { type: 'api_error', message: 'Apply suggestions failed.' },
+      });
+    }
+  });
+
   // POST /admin/api/test-connection
   router.post('/test-connection', async (_req: Request, res: Response) => {
     const result = await state.connectionTester.run();
@@ -294,6 +340,7 @@ export function buildAdminApiRouter(state: AdminState): Router {
             .map((m) => m.id)
             .filter((id): id is string => typeof id === 'string')
         : [];
+      state.modelRegistry.setCachedModels(arr);
       res.json({ models: arr, syncedAt: new Date().toISOString() });
     } catch (err) {
       const isAbort =

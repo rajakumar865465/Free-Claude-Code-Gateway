@@ -15,3 +15,20 @@ export interface FamilyRule {
   /** Optional backup model if primary fails (not enforced by proxy yet, informational) */
   backup?: string;
 }
+
+export interface AutoMapSuggestion {
+  claudeModel: string;
+  current: string;
+  suggested: string;
+  confidence: number;
+  reason: string;
+  alreadyCorrect: boolean;
+}
+
+export interface AutoMapResult {
+  suggestions: AutoMapSuggestion[];
+  defaultSuggestion: AutoMapSuggestion | null;
+  prefixStyle: 'prefixed' | 'bare' | 'mixed';
+  cachedAt: Date | null;
+  mixedWarning?: string;
+}
