@@ -240,7 +240,8 @@ export function buildAdminApiRouter(state: AdminState): Router {
             .map((m) => m.id)
             .filter((id): id is string => typeof id === 'string')
         : [];
-      res.json({ models: arr });
+      state.modelRegistry.setCachedModels(arr);
+      res.json({ models: arr, syncedAt: new Date().toISOString() });
     } catch (err) {
       const isAbort =
         (err instanceof Error && err.name === 'AbortError') ||

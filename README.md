@@ -81,7 +81,7 @@ This project exists for students, hobbyists, developers in regions where pricing
 - **`POST /v1/messages`** — Full Claude/Anthropic-compatible endpoint. Validates, converts, routes, and returns Anthropic-format responses.
 - **`POST /v1/chat/completions`** — OpenAI-compatible passthrough with server-side key injection.
 - **`GET /v1/models`** — Lists models from your configured upstream provider.
-- **Smart Model Router** — Glob pattern family rules + exact mappings. Map `claude-3-5-sonnet-*` to any provider model automatically.
+- **Smart Model Router** — Glob pattern family rules + exact mappings. Auto-Map feature detects prefix style (`vendor/model` vs bare `model`) and auto-suggests the correct provider ID with one click.
 - **Full Streaming** — Server-Sent Events with `message_start`, `content_block_*`, `message_delta`, `message_stop` — exactly what Claude Code expects.
 - **Tool Calling** — Anthropic `tools` / `tool_use` / `tool_result` ↔ OpenAI `tools` / `tool_calls` bidirectional conversion.
 - **Admin Dashboard** — Full SPA at `/admin` with real-time analytics, request monitoring, model router management, playground, and diagnostics.
@@ -185,6 +185,45 @@ Edit `config/models.json` to map Claude model names to your provider's models:
 
 You can also manage all mappings live from the **Admin Dashboard → Model Router** without editing files.
 
+### Auto-Map — Fix Provider ID Format in One Click
+
+OpenAI-compatible providers are inconsistent about model ID format. Some return `moonshotai/kimi-k2.6` (vendor prefixed), others return `kimi-k2.6` (bare name). This causes the UNSAVED status in the Model Router when you switch providers.
+
+**Auto-Map solves this automatically:**
+
+```
+Your mapping table:                     Provider returns:
+claude-3-5-sonnet  →  kimi-k2.6        moonshotai/kimi-k2.6  ← different format
+claude-opus-4      →  kimi-k2.6        kimi-k2.5
+                                        glm-4.6
+                                        gpt-4o
+```
+
+**How to use it:**
+
+1. Go to **Admin Dashboard → Model Router**
+2. Click **Sync Models** — fetches the live model list from your provider
+3. Click **Auto-Map** (unlocks after sync) — scores every row against the model list
+4. Yellow badges appear showing the suggested correct ID: `→ moonshotai/kimi-k2.6`
+5. Click **Apply N suggestions** to fix all rows at once
+6. Click **Save Router** to persist
+
+**How the scoring works:**
+
+The matcher normalizes both sides — strips vendor prefixes, strips suffixes like `-latest`/`-preview`, collapses separators — then scores on multiple signals:
+
+| Signal | Score |
+|---|---|
+| Exact raw match (`glm-4.6` = `glm-4.6`) | 1.0 |
+| Same name after stripping vendor prefix | 0.9 |
+| Same name after stripping suffixes | 0.85 |
+| Token similarity (Jaccard on `-`-split tokens) | 0–0.7 |
+| Vendor alias bonus (`moonshotai` ↔ `kimi`) | +0.1 |
+
+Only suggestions with **confidence ≥ 0.75** are shown. A green **✓ Correct** badge appears when your current mapping already uses the right format.
+
+The Provider Model input field also gets **autocomplete** — start typing and see all synced models as options.
+
 ---
 
 ## 🖥 Admin Dashboard
@@ -201,7 +240,7 @@ Access at `http://localhost:8787/admin`. A full SPA with 7 views:
 | **Live Requests** | Real-time SSE feed of every request, pause/resume, filters by status/model/endpoint, per-request detail drawer |
 | **Playground** | Send Claude or OpenAI requests directly from the UI, inspect the full translation pipeline, streaming support |
 | **Providers** | Upstream provider connection card, API key status, model sync, stats |
-| **Model Router** | CRUD for Claude→provider model mappings, family routing rules, available provider models |
+| **Model Router** | CRUD for Claude→provider model mappings, family routing rules, **Auto-Map** to sync and auto-suggest correct provider IDs, available provider models with autocomplete |
 | **Settings** | Runtime config — provider URL, API key, default model, rate limits, timeout, CORS — applied instantly |
 | **Diagnostics** | Step-by-step connection health check with timeline, error reference, quick connection test |
 
