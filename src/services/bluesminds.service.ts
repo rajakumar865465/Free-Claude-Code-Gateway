@@ -16,11 +16,12 @@ export interface ProviderResponse<T> {
   rawText?: string;
 }
 
-// Statuses worth retrying — NOT 429, that is a rate limit and should fail fast
-const RETRYABLE_STATUSES = new Set([500, 502, 503, 504, 529]);
-const MAX_RETRIES = 4;
-// Backoff delays in ms: 1s, 2s, 4s, 8s
-const BACKOFF_MS = [1000, 2000, 4000, 8000];
+// Statuses worth retrying — NOT 429 (rate limit), NOT 502 (connection drop/bad gateway)
+// 502 means the upstream closed the connection or the model is broken — retrying wastes time.
+const RETRYABLE_STATUSES = new Set([503, 504, 529]);
+const MAX_RETRIES = 1;
+// Backoff delays in ms: 1s only — single retry, fast feedback
+const BACKOFF_MS = [1000];
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -4,6 +4,11 @@ import { getConfig } from '../config/env';
 export function buildHealthRouter(): Router {
   const router = Router();
 
+  // Silence browser favicon requests — returns empty 204 to avoid 404 noise in logs
+  router.get('/favicon.ico', (_req: Request, res: Response) => {
+    res.status(204).end();
+  });
+
   // Read config at request time so hot-reloaded values are always current
   router.get('/health', (_req: Request, res: Response) => {
     const cfg = getConfig();
