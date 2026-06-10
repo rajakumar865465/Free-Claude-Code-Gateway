@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Free Claude Code Gateway — Run Claude Code CLI Free via DeepSeek, Kimi & OpenRouter</title>
+  <meta name="description" content="Open-source gateway that lets you run Claude Code CLI for free using DeepSeek, Kimi, GLM, Groq, or OpenRouter. No Anthropic subscription required. Drop-in API replacement.">
+  <meta name="keywords" content="free claude code, claude code free, claude code alternative, claude code proxy, deepseek claude code, openrouter claude code, anthropic api alternative">
+  <meta name="author" content="Free Claude Code Gateway contributors">
+  <meta name="robots" content="index, follow">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Free Claude Code Gateway — Run Claude Code Free via DeepSeek, Kimi & OpenRouter">
+  <meta property="og:description" content="Open-source gateway to run Claude Code CLI for free. Route requests through DeepSeek, Kimi, GLM, Groq, or any OpenAI-compatible provider. No Anthropic key needed.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://github.com/rajakumar865465/Free-Claude-Code-Gateway">
+  <meta property="og:site_name" content="Free Claude Code Gateway">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Free Claude Code Gateway — Run Claude Code Free via DeepSeek, Kimi & OpenRouter">
+  <meta name="twitter:description" content="Open-source gateway to run Claude Code CLI for free. Route requests through DeepSeek, Kimi, GLM, Groq, or any OpenAI-compatible provider.">
+
+  <link rel="canonical" href="https://github.com/rajakumar865465/Free-Claude-Code-Gateway">
+
+  <!-- JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Free Claude Code Gateway",
+    "description": "Open-source gateway that translates Anthropic API requests to OpenAI format, letting you run Claude Code CLI for free via DeepSeek, Kimi, GLM, Groq, or any OpenAI-compatible provider.",
+    "url": "https://github.com/rajakumar865465/Free-Claude-Code-Gateway",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Windows, macOS, Linux",
+    "license": "https://opensource.org/licenses/MIT",
+    "programmingLanguage": "TypeScript",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "featureList": [
+      "Anthropic API compatible drop-in replacement",
+      "Full streaming SSE support",
+      "Tool calling and function use",
+      "Smart model routing via glob patterns",
+      "Admin dashboard",
+      "Docker and PM2 deployment"
+    ]
+  }
+  </script>
+
+  <meta name="theme-color" content="#030712" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f0f6ff" media="(prefers-color-scheme: light)">
+  <meta property="og:image" content="https://img.shields.io/badge/Free_Claude_Code_Gateway-open--source-00d4ff?style=for-the-badge">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Apply theme before first paint to avoid flash and fix icon state -->
+  <script>
+    (function() {
+      var saved = localStorage.getItem('theme');
+      var theme = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
+  <!-- Critical CSS -->
+  <style>
+    body { background: var(--bg, #030712); color: var(--text, #e2f0ff); font-family: 'Outfit', -apple-system, sans-serif; margin: 0; overflow-x: hidden; }
+    nav { height: 64px; display: flex; align-items: center; }
+    #hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding-top: 64px; }
+    h1 { font-size: clamp(2.8rem, 6vw, 5rem); font-weight: 800; line-height: 1.05; margin: 0 0 1.25rem; font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body>
+
+  <!-- Skip link -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- Navigation -->
+  <header>
+    <nav id="main-nav" aria-label="Main navigation">
+      <div class="nav-inner">
+        <a href="#hero" class="nav-logo">Free Claude Code</a>
+        <ul class="nav-links" role="list">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#how-it-works">How It Works</a></li>
+          <li><a href="#providers">Providers</a></li>
+          <li><a href="#quick-start">Quick Start</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li>
+            <a href="https://github.com/rajakumar865465/Free-Claude-Code-Gateway" target="_blank" rel="noopener" class="nav-github">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+              </svg>
+              GitHub
+            </a>
+            <span id="star-count" class="star-count"></span>
+          </li>
+        </ul>
+        <button class="theme-toggle" aria-label="Switch to light theme" id="theme-toggle">
+          <span class="theme-toggle__track" aria-hidden="true">
+            <span class="theme-toggle__thumb">
+              <!-- Sun icon -->
+              <svg class="icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+              </svg>
+              <!-- Moon icon -->
+              <svg class="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+              </svg>
+            </span>
+          </span>
+        </button>
+        <button class="hamburger" aria-label="Open menu" aria-expanded="false" id="hamburger">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <!-- Mobile menu -->
+      <div class="mobile-menu" id="mobile-menu" role="dialog" aria-label="Mobile navigation">
+        <ul role="list">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#how-it-works">How It Works</a></li>
+          <li><a href="#providers">Providers</a></li>
+          <li><a href="#quick-start">Quick Start</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="https://github.com/rajakumar865465/Free-Claude-Code-Gateway" target="_blank" rel="noopener">GitHub</a></li>
+        </ul>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main-content">
+
+    <!-- Hero -->
+    <section id="hero" aria-labelledby="hero-heading">
+      <canvas id="hero-canvas" aria-hidden="true"></canvas>
+      <div class="section-inner hero-inner">
+        <div class="hero-eyebrow reveal">Open Source Gateway</div>
+        <h1 id="hero-heading">
+          <span class="hero-title-main">Free Claude Code Gateway</span>
+        </h1>
+        <p class="hero-tagline reveal reveal-delay-1">Run Claude Code CLI for free — route requests through DeepSeek, Kimi, GLM, Groq, or any OpenAI-compatible provider. No Anthropic subscription needed.</p>
+        <div class="hero-badge reveal reveal-delay-2">One Endpoint. Any Provider. Claude Code Compatible.</div>
+        <div class="hero-cta reveal reveal-delay-3">
+          <a href="#quick-start" class="btn btn-primary">Get Started</a>
+          <a href="https://github.com/rajakumar865465/Free-Claude-Code-Gateway" target="_blank" rel="noopener" class="btn btn-secondary">View on GitHub</a>
+        </div>
+        <pre class="ascii-diagram reveal reveal-delay-4" aria-label="Architecture diagram: Claude Code CLI connects to Gateway at port 8787, which connects to Provider">&#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;     &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;     &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;
+&#x2502;  Claude Code CLI &#x2502;&#x2500;&#x2500;&#x2500;&#x2500;&#x25B6;&#x2502;   Gateway   &#x2502;&#x2500;&#x2500;&#x2500;&#x2500;&#x25B6;&#x2502;   Provider   &#x2502;
+&#x2502;  (Anthropic API) &#x2502;&#x25C0;&#x2500;&#x2500;&#x2500;&#x2500;&#x2502; :8787       &#x2502;&#x25C0;&#x2500;&#x2500;&#x2500;&#x2500;&#x2502;  (OpenAI API)&#x2502;
+&#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;     &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;     &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;</pre>
+        <div class="hero-badges-row reveal reveal-delay-5">
+          <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" width="100" height="20" alt="MIT License">
+          <img src="https://img.shields.io/badge/node-%3E%3D20-green?style=flat-square" width="100" height="20" alt="Node.js 20+">
+        </div>
+        <div class="hero-stars reveal reveal-delay-6">
+          <span id="hero-star-count"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" aria-labelledby="features-heading">
+      <div class="section-inner">
+        <h2 id="features-heading" class="reveal">What You Get</h2>
+        <div class="features-grid">
+
+          <article class="feature-card reveal reveal-delay-1">
+            <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+            </svg>
+            <h3>Anthropic API Compatible</h3>
+            <p>Drop-in replacement at POST /v1/messages. Zero client changes required.</p>
+          </article>
+
+          <article class="feature-card reveal reveal-delay-2">
+            <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/>
+            </svg>
+            <h3>OpenAI Passthrough</h3>
+            <p>Native POST /v1/chat/completions support for OpenAI-compatible clients.</p>
+          </article>
+
+          <article class="feature-card reveal reveal-delay-3">
+            <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 01-9 9"/>
+            </svg>
+            <h3>Smart Model Routing</h3>
+            <p>Glob pattern family rules map claude-3-* to your chosen provider model.</p>
+          </article>
+
+          <article class="feature-card reveal reveal-delay-4">
+            <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49m-8.48-.01a6 6 0 010-8.49m11.31-2.82a10 10 0 010 14.14m-14.14 0a10 10 0 010-14.14"/>
+            </svg>
+            <h3>Full Streaming SSE</h3>
+            <p>Real-time token streaming with Server-Sent Events, fully proxied.</p>
+          </article>
+
+          <article class="feature-card reveal reveal-delay-5">
+            <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+            </svg>
+            <h3>Tool Calling Support</h3>
+            <p>Function calling and tool use fully translated between API formats.</p>
+          </article>
+
+          <article class="feature-card reveal reveal-delay-6">
+            <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            <h3>Admin Dashboard</h3>
+            <p>Built-in web UI at /admin to monitor requests and configure routing.</p>
+          </article>
+
+          <article class="feature-card reveal reveal-delay-1">
+            <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+            </svg>
+            <h3>No Database Required</h3>
+            <p>Stateless design with flat-file persistence. No setup, no migrations.</p>
+          </article>
+
+          <article class="feature-card reveal reveal-delay-2">
+            <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+            </svg>
+            <h3>Docker &amp; PM2 Ready</h3>
+            <p>Production deployment with Docker Compose or PM2 process manager.</p>
+          </article>
+
+        </div>
+        <div class="tech-stack reveal">
+          <span class="badge">TypeScript</span>
+          <span class="badge">Express</span>
+          <span class="badge">Node.js 20+</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- How It Works -->
+    <section id="how-it-works" aria-labelledby="how-heading">
+      <div class="section-inner">
+        <h2 id="how-heading" class="reveal">How It Works</h2>
+        <ol class="steps-list">
+          <li class="reveal reveal-delay-1"><strong>Install &amp; configure</strong> the Gateway locally</li>
+          <li class="reveal reveal-delay-2"><strong>Set the base URL</strong> <code>ANTHROPIC_BASE_URL=http://localhost:8787</code> in your tool</li>
+          <li class="reveal reveal-delay-3">The Gateway <strong>translates</strong> your Claude API request to OpenAI format</li>
+          <li class="reveal reveal-delay-4">Your chosen Provider <strong>processes</strong> the request</li>
+          <li class="reveal reveal-delay-5">The Gateway <strong>proxies the response</strong> back to Anthropic format</li>
+        </ol>
+        <div class="flow-diagram reveal" aria-label="Flow: Claude Code sends Anthropic format to Gateway at port 8787, Gateway sends OpenAI format to Provider">
+          <div class="flow-node">Claude Code<br><small>Anthropic format</small></div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div class="flow-node flow-node--gateway">Gateway<br><small>:8787</small></div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div class="flow-node">Provider<br><small>OpenAI format</small></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Providers -->
+    <section id="providers" aria-labelledby="providers-heading">
+      <div class="section-inner">
+        <h2 id="providers-heading" class="reveal">Supported Providers</h2>
+        <div class="providers-grid">
+
+          <article class="provider-card reveal reveal-delay-1">
+            <h3>Kimi (MoonShot)</h3>
+            <code class="provider-url">https://api.moonshot.cn/v1</code>
+            <p>moonshot-v1-8k, moonshot-v1-32k</p>
+          </article>
+
+          <article class="provider-card reveal reveal-delay-2">
+            <h3>GLM / Z.ai</h3>
+            <code class="provider-url">https://open.bigmodel.cn/api/paas/v4</code>
+            <p>glm-4, glm-4-flash (free tier)</p>
+          </article>
+
+          <article class="provider-card reveal reveal-delay-3">
+            <h3>DeepSeek</h3>
+            <code class="provider-url">https://api.deepseek.com/v1</code>
+            <p>deepseek-chat, deepseek-coder</p>
+          </article>
+
+          <article class="provider-card reveal reveal-delay-4">
+            <h3>OpenRouter</h3>
+            <code class="provider-url">https://openrouter.ai/api/v1</code>
+            <p>100+ models, unified billing</p>
+          </article>
+
+          <article class="provider-card reveal reveal-delay-5">
+            <h3>Mistral</h3>
+            <code class="provider-url">https://api.mistral.ai/v1</code>
+            <p>mistral-large, codestral</p>
+          </article>
+
+          <article class="provider-card reveal reveal-delay-6">
+            <h3>Fireworks AI</h3>
+            <code class="provider-url">https://api.fireworks.ai/inference/v1</code>
+            <p>Fast inference, Llama 3</p>
+          </article>
+
+          <article class="provider-card reveal reveal-delay-1">
+            <h3>Cerebras</h3>
+            <code class="provider-url">https://api.cerebras.ai/v1</code>
+            <p>Ultra-fast Llama 3 inference</p>
+          </article>
+
+          <article class="provider-card reveal reveal-delay-2">
+            <h3>Groq</h3>
+            <code class="provider-url">https://api.groq.com/openai/v1</code>
+            <p>Fastest free tier available</p>
+          </article>
+
+          <article class="provider-card reveal reveal-delay-3">
+            <h3>LM Studio</h3>
+            <code class="provider-url">http://localhost:1234/v1</code>
+            <p>Local models, privacy-first</p>
+          </article>
+
+          <article class="provider-card reveal reveal-delay-4">
+            <h3>Ollama</h3>
+            <code class="provider-url">http://localhost:11434/v1</code>
+            <p>Self-hosted, 100% offline</p>
+          </article>
+
+        </div>
+        <p class="providers-note reveal">Works with any OpenAI-compatible API endpoint — self-hosted, vLLM, llama.cpp, and more.</p>
+      </div>
+    </section>
+
+    <!-- Quick Start -->
+    <section id="quick-start" aria-labelledby="quickstart-heading">
+      <div class="section-inner">
+        <h2 id="quickstart-heading">Quick Start</h2>
+
+        <h3 class="step-label">1. Clone the repository</h3>
+        <div class="code-block-wrapper">
+          <button class="copy-btn" aria-label="Copy to clipboard" data-code="git clone https://github.com/rajakumar865465/Free-Claude-Code-Gateway.git">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+            </svg>
+          </button>
+          <pre><code>git clone https://github.com/rajakumar865465/Free-Claude-Code-Gateway.git</code></pre>
+        </div>
+
+        <h3 class="step-label">2. Install dependencies</h3>
+        <div class="code-block-wrapper">
+          <button class="copy-btn" aria-label="Copy to clipboard" data-code="cd Free-Claude-Code-Gateway && npm install">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+            </svg>
+          </button>
+          <pre><code>cd Free-Claude-Code-Gateway &amp;&amp; npm install</code></pre>
+        </div>
+
+        <h3 class="step-label">3. Configure environment</h3>
+        <div class="code-block-wrapper">
+          <button class="copy-btn" aria-label="Copy to clipboard" data-code="cp .env.example .env">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+            </svg>
+          </button>
+          <pre><code>cp .env.example .env</code></pre>
+        </div>
+
+        <h3 class="step-label">4. Start the gateway</h3>
+        <div class="code-block-wrapper">
+          <button class="copy-btn" aria-label="Copy to clipboard" data-code="npm run dev">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+            </svg>
+          </button>
+          <pre><code>npm run dev</code></pre>
+        </div>
+
+        <h3 class="step-label">5. Configure Claude Code CLI</h3>
+        <div class="tabs" role="tablist" aria-label="Operating system">
+          <button class="tab-btn active" data-tab="unix" role="tab" aria-selected="true" aria-controls="tab-unix">Linux / macOS</button>
+          <button class="tab-btn" data-tab="windows" role="tab" aria-selected="false" aria-controls="tab-windows">Windows PowerShell</button>
+        </div>
+        <div class="tab-panel" id="tab-unix" role="tabpanel">
+          <div class="code-block-wrapper">
+            <button class="copy-btn" aria-label="Copy to clipboard" data-code="export ANTHROPIC_BASE_URL=http://localhost:8787
+export ANTHROPIC_MODEL=claude-3-5-sonnet-20241022">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+            </button>
+            <pre><code>export ANTHROPIC_BASE_URL=http://localhost:8787
+export ANTHROPIC_MODEL=claude-3-5-sonnet-20241022</code></pre>
+          </div>
+          <div class="code-block-wrapper">
+            <button class="copy-btn" aria-label="Copy to clipboard" data-code="claude">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+            </button>
+            <pre><code>claude</code></pre>
+          </div>
+        </div>
+        <div class="tab-panel hidden" id="tab-windows" role="tabpanel">
+          <div class="code-block-wrapper">
+            <button class="copy-btn" aria-label="Copy to clipboard" data-code="$env:ANTHROPIC_BASE_URL = &quot;http://localhost:8787&quot;
+$env:ANTHROPIC_MODEL = &quot;claude-3-5-sonnet-20241022&quot;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+            </button>
+            <pre><code>$env:ANTHROPIC_BASE_URL = "http://localhost:8787"
+$env:ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022"</code></pre>
+          </div>
+          <div class="code-block-wrapper">
+            <button class="copy-btn" aria-label="Copy to clipboard" data-code="claude">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+            </button>
+            <pre><code>claude</code></pre>
+          </div>
+        </div>
+
+        <p class="quickstart-note">The gateway starts at <code>http://localhost:8787</code>. Point any Claude-compatible tool at it.</p>
+
+        <div aria-live="polite" id="copy-feedback" class="sr-only"></div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" aria-labelledby="faq-heading">
+      <div class="section-inner">
+        <h2 id="faq-heading" class="reveal">Frequently Asked Questions</h2>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Can I use Claude Code for free?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. This open-source gateway translates Claude Code CLI requests to OpenAI format and forwards them to a free provider like DeepSeek, Groq, GLM, or Kimi — all of which offer free tiers."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Do I need an Anthropic API key?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. You point Claude Code at the local gateway (http://localhost:8787) instead of Anthropic's servers. The gateway uses your chosen provider's API key, not Anthropic's."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Which AI providers are supported?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Any OpenAI-compatible endpoint works: DeepSeek, Kimi (MoonShot), GLM/Z.ai, OpenRouter, Groq, Mistral, Fireworks AI, Cerebras, LM Studio, Ollama, and vLLM."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is this legal and does it violate Anthropic's terms?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "The gateway is a standard API format converter — it does not bypass, crack, or circumvent any Anthropic system. You are responsible for complying with both Anthropic's and your upstream provider's terms of service."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Does it support streaming and tool use?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. The gateway fully proxies Server-Sent Events (SSE) for real-time token streaming and translates tool/function calling between Anthropic and OpenAI formats."
+              }
+            }
+          ]
+        }
+        </script>
+        <dl class="faq-list">
+          <div class="faq-item reveal reveal-delay-1">
+            <dt>Can I use Claude Code for free?</dt>
+            <dd>Yes. This open-source gateway translates Claude Code CLI requests to OpenAI format and forwards them to a free provider like DeepSeek, Groq, GLM, or Kimi — all of which offer free tiers.</dd>
+          </div>
+          <div class="faq-item reveal reveal-delay-2">
+            <dt>Do I need an Anthropic API key?</dt>
+            <dd>No. You point Claude Code at the local gateway (<code>http://localhost:8787</code>) instead of Anthropic's servers. The gateway uses your chosen provider's API key, not Anthropic's.</dd>
+          </div>
+          <div class="faq-item reveal reveal-delay-3">
+            <dt>Which AI providers are supported?</dt>
+            <dd>Any OpenAI-compatible endpoint works: DeepSeek, Kimi (MoonShot), GLM/Z.ai, OpenRouter, Groq, Mistral, Fireworks AI, Cerebras, LM Studio, Ollama, and vLLM.</dd>
+          </div>
+          <div class="faq-item reveal reveal-delay-4">
+            <dt>Is this legal and does it violate Anthropic's terms?</dt>
+            <dd>The gateway is a standard API format converter — it does not bypass, crack, or circumvent any Anthropic system. You are responsible for complying with both Anthropic's and your upstream provider's terms of service.</dd>
+          </div>
+          <div class="faq-item reveal reveal-delay-5">
+            <dt>Does it support streaming and tool use?</dt>
+            <dd>Yes. The gateway fully proxies Server-Sent Events (SSE) for real-time token streaming and translates tool/function calling between Anthropic and OpenAI formats.</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <!-- Responsible Use -->
+    <section id="responsible-use" aria-labelledby="responsible-heading">
+      <div class="section-inner">
+        <div class="responsible-use-section">
+          <h2 id="responsible-heading">Responsible Use</h2>
+          <p>This gateway does not bypass, crack, or circumvent Anthropic's systems. It is a standard API format converter — the same thing any OpenAI-compatible client library does.</p>
+          <p>You are responsible for complying with the terms of service of both Anthropic and your chosen upstream provider.</p>
+          <div class="buy-section">
+            <a href="https://claude.ai/download" target="_blank" rel="noopener" class="btn btn-buy">💙 Buy Claude Code — Support Anthropic</a>
+            <p class="buy-note">If this gateway is useful and you can afford it — please support Anthropic and buy Claude Code. It's the right thing to do.</p>
+          </div>
+          <p class="disclaimer">Not affiliated with or endorsed by Anthropic. Claude® is a trademark of Anthropic, PBC.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-col">
+        <h4>Project</h4>
+        <ul role="list">
+          <li><a href="https://github.com/rajakumar865465/Free-Claude-Code-Gateway" target="_blank" rel="noopener">⭐ Star on GitHub</a></li>
+          <li><a href="https://github.com/rajakumar865465/Free-Claude-Code-Gateway/issues/new?template=bug_report.md" target="_blank" rel="noopener">Report a Bug</a></li>
+          <li><a href="https://github.com/rajakumar865465/Free-Claude-Code-Gateway/issues/new?template=feature_request.md" target="_blank" rel="noopener">Request a Feature</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Legal &amp; Contribute</h4>
+        <ul role="list">
+          <li><a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a></li>
+          <li><a href="https://github.com/rajakumar865465/Free-Claude-Code-Gateway/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing — PRs welcome</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Support</h4>
+        <ul role="list">
+          <li><a href="https://claude.ai/download" target="_blank" rel="noopener">💙 Buy Claude Code</a></li>
+        </ul>
+      </div>
+      <div class="footer-col footer-col--wide">
+        <p class="footer-disclaimer">Not affiliated with or endorsed by Anthropic. Claude® is a trademark of Anthropic, PBC.</p>
+        <p class="footer-credit">Built with ❤️ by the open-source community.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js" defer></script>
+</body>
+</html>
