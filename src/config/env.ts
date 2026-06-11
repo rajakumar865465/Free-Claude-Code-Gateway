@@ -15,6 +15,22 @@ export interface AppConfig {
   version: string;
   name: string;
   clearLogOnRestart: boolean;
+  /** ms to wait for the first SSE chunk (TTFT). Default 30_000 */
+  firstChunkTimeoutMs: number;
+  /** ms of silence between chunks AFTER the first chunk arrives. Default 30_000 */
+  idleTimeoutMs: number;
+  /** ms to wait for upstream HTTP stream headers. Default 12_000 */
+  streamConnectTimeoutMs: number;
+  /** SSE keep-alive ping interval ms; 0 = disabled. Default 10_000 */
+  keepAlivePingMs: number;
+  /** Timeout ms for the non-stream fallback request. Default 30_000 */
+  nonStreamFallbackTimeoutMs: number;
+  /** Consecutive 504s before opening the circuit breaker. Default 2 */
+  circuitBreakerFailures: number;
+  /** ms the circuit stays open before a probe is allowed. Default 30_000 */
+  circuitBreakerRecoveryMs: number;
+  /** Rolling window in which failures are counted. Default 60_000 */
+  circuitBreakerRollingMs: number;
 }
 
 let cached: AppConfig | null = null;
@@ -48,7 +64,7 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
   const defaultModel = env.DEFAULT_MODEL?.trim() || 'gpt-4.1';
   const strictModelMapping = parseBool(env.STRICT_MODEL_MAPPING, false);
   const proxyApiKey = env.PROXY_API_KEY?.trim() ?? '';
-  const requestTimeoutMs = parseInt10(env.REQUEST_TIMEOUT_MS, 30000);
+  const requestTimeoutMs = parseInt10(env.REQUEST_TIMEOUT_MS, 120_000);
   const rateLimitPerMinute = parseInt10(env.RATE_LIMIT_PER_MINUTE, 60);
   const maxBodySize = env.MAX_BODY_SIZE?.trim() || '20mb';
   const allowedOrigins = parseOrigins(env.ALLOWED_ORIGINS);
@@ -62,6 +78,16 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
 
   const adminPassword = env.ADMIN_PASSWORD?.trim() ?? '';
   const clearLogOnRestart = parseBool(env.CLEAR_LOG_ON_RESTART, false);
+
+  // Streaming resilience knobs
+  const firstChunkTimeoutMs        = parseInt10(env.FIRST_CHUNK_TIMEOUT_MS,        30_000);
+  const idleTimeoutMs               = parseInt10(env.IDLE_TIMEOUT_MS,              30_000);
+  const streamConnectTimeoutMs      = parseInt10(env.STREAM_CONNECT_TIMEOUT_MS,    12_000);
+  const keepAlivePingMs             = parseInt10(env.KEEP_ALIVE_PING_MS,           10_000);
+  const nonStreamFallbackTimeoutMs  = parseInt10(env.NON_STREAM_FALLBACK_TIMEOUT_MS, 30_000);
+  const circuitBreakerFailures      = parseInt10(env.CIRCUIT_BREAKER_FAILURES,     2);
+  const circuitBreakerRecoveryMs    = parseInt10(env.CIRCUIT_BREAKER_RECOVERY_MS,  30_000);
+  const circuitBreakerRollingMs     = parseInt10(env.CIRCUIT_BREAKER_ROLLING_MS,   60_000);
 
   const cfg: AppConfig = {
     bluesmindsApiKey,
@@ -80,6 +106,14 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
     version: '1.0.0',
     name: 'Free Claude Code Gateway',
     clearLogOnRestart,
+    firstChunkTimeoutMs,
+    idleTimeoutMs,
+    streamConnectTimeoutMs,
+    keepAlivePingMs,
+    nonStreamFallbackTimeoutMs,
+    circuitBreakerFailures,
+    circuitBreakerRecoveryMs,
+    circuitBreakerRollingMs,
   };
 
   cached = cfg;

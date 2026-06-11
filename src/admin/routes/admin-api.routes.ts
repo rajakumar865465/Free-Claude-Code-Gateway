@@ -259,9 +259,13 @@ export function buildAdminApiRouter(state: AdminState): Router {
   });
 
   // POST /admin/api/models/auto-map — compute suggestions from cached model list
-  router.post('/models/auto-map', (_req: Request, res: Response) => {
+  router.post('/models/auto-map', (req: Request, res: Response) => {
     try {
-      const defaultModel = state.configManager.getDefaultModel();
+      // Prefer the unsaved UI value sent in the request body so that changing
+      // the Default Fallback Model and clicking Auto-Map (before Save Router)
+      // correctly uses the new value rather than the last-persisted config value.
+      const bodyDefault = (req.body as { defaultModel?: string })?.defaultModel?.trim();
+      const defaultModel = bodyDefault || state.configManager.getDefaultModel();
       const result = state.modelRegistry.computeAutoMap(defaultModel);
       res.json(result);
     } catch (err) {

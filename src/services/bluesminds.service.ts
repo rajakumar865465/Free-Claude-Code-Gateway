@@ -14,14 +14,33 @@ export interface ProviderResponse<T> {
   status: number;
   body: T;
   rawText?: string;
+  retryAfterMs?: number;   // populated when upstream sends Retry-After header
+  cascadedToBackup?: boolean; // true when request was served by the backup model
 }
 
-// Statuses worth retrying — NOT 429 (rate limit), NOT 502 (connection drop/bad gateway)
-// 502 means the upstream closed the connection or the model is broken — retrying wastes time.
-const RETRYABLE_STATUSES = new Set([503, 504, 529]);
-const MAX_RETRIES = 1;
-// Backoff delays in ms: 1s only — single retry, fast feedback
-const BACKOFF_MS = [1000];
+// Statuses worth retrying.
+// 429 — provider rate limit: respect Retry-After header, wait, then retry once.
+// 500 — some providers return 500 when a model is temporarily overloaded.
+// 503, 529 — standard transient server errors.
+//
+// 504 is DELIBERATELY NOT retryable here. A 504 means a timeout already fired —
+// either the provider's own gateway timed out, or OUR client-side timeout
+// (AbortControllerWithTimeout) elapsed. Retrying the identical slow request just
+// re-waits the entire timeout budget again, turning one slow request into a
+// multi-minute stall (observed: duration_ms ~300000). 504 still triggers a
+// cascade to the BACKUP model (a different route), which is the useful action.
+//
+// NOT 502 — TCP connection drop means the model slug is broken; retrying wastes time.
+const RETRYABLE_STATUSES = new Set([429, 503, 529]);
+// Statuses that trigger an immediate cascade to the backup model (different route).
+// 504/500 are included here — a stalled/erroring primary should switch routes,
+// not retry the same one.
+const BACKUP_TRIGGER_STATUSES = new Set([429, 500, 503, 504, 529]);
+const MAX_RETRIES = 2;
+// Fallback backoff when no Retry-After header: 1s, 3s
+const BACKOFF_MS = [1000, 3000];
+// Hard cap on Retry-After to prevent waiting forever (ms)
+const MAX_RETRY_AFTER_MS = 15_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -61,6 +80,11 @@ export class BluesmindsService {
     return this._timeoutMs ?? getConfig().requestTimeoutMs;
   }
 
+  /** Timeout for non-stream fallback requests — shorter than the main timeout. */
+  private get nonStreamFallbackTimeoutMs(): number {
+    return getConfig().nonStreamFallbackTimeoutMs;
+  }
+
   private get authHeader(): Record<string, string> {
     return { Authorization: `Bearer ${this.apiKey}` };
   }
@@ -69,9 +93,10 @@ export class BluesmindsService {
     method: 'GET' | 'POST',
     path: string,
     body?: unknown,
+    overrideTimeoutMs?: number,
   ): Promise<ProviderResponse<T>> {
     const url = `${this.baseUrl}${path}`;
-    const controller = new AbortControllerWithTimeout(this.timeoutMs);
+    const controller = new AbortControllerWithTimeout(overrideTimeoutMs ?? this.timeoutMs);
     const start = Date.now();
     try {
       const res = await fetch(url, {
@@ -91,15 +116,28 @@ export class BluesmindsService {
         parsed = text ? JSON.parse(text) : null;
       } catch { /* keep text */ }
 
-      return { ok: res.ok, status: res.status, body: parsed as T, rawText: text };
+      // Read Retry-After header (seconds or HTTP-date) for 429 handling
+      let retryAfterMs: number | undefined;
+      if (res.status === 429) {
+        const retryAfter = res.headers.get('retry-after');
+        if (retryAfter) {
+          const seconds = Number(retryAfter);
+          if (Number.isFinite(seconds) && seconds > 0) {
+            retryAfterMs = Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
+          }
+        }
+      }
+
+      return { ok: res.ok, status: res.status, body: parsed as T, rawText: text, retryAfterMs };
     } catch (err) {
       const isAbort =
         (err instanceof Error && err.name === 'AbortError') ||
         (err instanceof DOMException && err.name === 'AbortError');
+      const usedTimeout = overrideTimeoutMs ?? this.timeoutMs;
       const errorBody: OpenAIErrorResponse['body'] = {
         error: {
           message: isAbort
-            ? `Request aborted after ${Date.now() - start}ms (timeout ${this.timeoutMs}ms)`
+            ? `Request aborted after ${Date.now() - start}ms (timeout ${usedTimeout}ms)`
             : err instanceof Error ? err.message : String(err),
           type: isAbort ? 'timeout_error' : 'network_error',
         },
@@ -136,9 +174,10 @@ export class BluesmindsService {
         return result;
       }
 
-      const delay = BACKOFF_MS[attempt] ?? 8000;
+      // Use Retry-After from provider if present (e.g. Kimi 429), else use fixed backoff
+      const delay = result.retryAfterMs ?? BACKOFF_MS[attempt] ?? 3000;
       logger.warn(
-        { status: result.status, attempt: attempt + 1, retryInMs: delay },
+        { status: result.status, attempt: attempt + 1, retryInMs: delay, retryAfterHeader: result.retryAfterMs != null },
         'upstream_retrying',
       );
       await sleep(delay);
@@ -150,32 +189,110 @@ export class BluesmindsService {
     return this.request<OpenAIModelsResponse>('GET', '/models');
   }
 
-  async createChatCompletion(
+  /**
+   * Non-stream fallback: sends a plain (non-streaming) chat completion request.
+   * Used when a streaming attempt 504s/stalls and we need a guaranteed response
+   * rather than another streaming retry.
+   *
+   * Uses NON_STREAM_FALLBACK_TIMEOUT_MS (default 60s) instead of the full
+   * REQUEST_TIMEOUT_MS so a stalled provider doesn't block the client for 2 minutes.
+   * Does NOT retry on failure — if the fallback itself fails the caller reports the error.
+   */
+  async createChatCompletionNonStream(
     body: OpenAIChatCompletionsRequest,
   ): Promise<ProviderResponse<OpenAIChatCompletionsResponse | OpenAIErrorResponse>> {
-    return this.request<OpenAIChatCompletionsResponse>('POST', '/chat/completions', body);
+    // Single attempt only — no retry loop. The caller already tried the stream
+    // path and it failed; burning retry time here makes the UX worse.
+    return this.requestOnce<OpenAIChatCompletionsResponse>(
+      'POST',
+      '/chat/completions',
+      { ...body, stream: false },
+      this.nonStreamFallbackTimeoutMs,
+    );
+  }
+
+  async createChatCompletion(
+    body: OpenAIChatCompletionsRequest,
+    backupModel?: string | null,
+  ): Promise<ProviderResponse<OpenAIChatCompletionsResponse | OpenAIErrorResponse>> {
+    const logger = getLogger();
+
+    // Cascade to backup immediately on transient server errors — before retrying.
+    // This avoids waiting through multiple timeouts on a dead primary.
+    const result = await this.requestOnce<OpenAIChatCompletionsResponse>('POST', '/chat/completions', body);
+
+    // Only cascade when the backup is a DIFFERENT model — cascading to the same
+    // model just re-runs the identical failing request.
+    if (!result.ok && backupModel && backupModel !== body.model && BACKUP_TRIGGER_STATUSES.has(result.status)) {
+      logger.warn(
+        { primaryModel: body.model, backupModel, primaryStatus: result.status },
+        'upstream_cascade',
+      );
+      const backupResult = await this.request<OpenAIChatCompletionsResponse>(
+        'POST',
+        '/chat/completions',
+        { ...body, model: backupModel },
+      );
+      return { ...backupResult, cascadedToBackup: true };
+    }
+
+    // For 429 and other retryable statuses without a backup, use full retry logic
+    if (!result.ok && RETRYABLE_STATUSES.has(result.status)) {
+      return this.request<OpenAIChatCompletionsResponse>('POST', '/chat/completions', body);
+    }
+
+    return result;
   }
 
   async createChatCompletionStream(
     body: OpenAIChatCompletionsRequest,
-  ): Promise<{ ok: true; response: globalThis.Response } | { ok: false; status: number; body: unknown }> {
+    backupModel?: string | null,
+    externalSignal?: AbortSignal,
+  ): Promise<{ ok: true; response: globalThis.Response; cascadedToBackup?: boolean } | { ok: false; status: number; body: unknown; bothStreamsFailed?: boolean }> {
     const logger = getLogger();
     let attempt = 0;
 
     while (true) {
-      const result = await this.streamOnce(body);
+      const result = await this.streamOnce(body, externalSignal);
 
-      if (result.ok || !RETRYABLE_STATUSES.has(result.status)) {
+      if (result.ok) {
         return result;
       }
 
+      // Cascade to backup immediately — skip if backup === primary (self-loop)
+      if (backupModel && backupModel !== body.model && BACKUP_TRIGGER_STATUSES.has(result.status)) {
+        logger.warn(
+          { primaryModel: body.model, backupModel, primaryStatus: result.status },
+          'upstream_cascade',
+        );
+        const backupResult = await this.streamOnce({ ...body, model: backupModel }, externalSignal);
+        if (backupResult.ok) {
+          return { ...backupResult, cascadedToBackup: true };
+        }
+        // Both primary AND backup failed — caller should skip non-stream
+        return { ...backupResult, bothStreamsFailed: true };
+      }
+
+      // Non-retryable errors — return immediately
+      if (!RETRYABLE_STATUSES.has(result.status)) {
+        return result;
+      }
+
+      // 504/503 with no usable backup: skip retries immediately so caller
+      // can attempt non-stream fallback without waiting 1s + 3s for nothing.
+      if (result.status === 504 || result.status === 503) {
+        return result;
+      }
+
+      // For remaining retryable statuses (429 rate-limit)
       if (attempt >= MAX_RETRIES) {
         return result;
       }
 
-      const delay = BACKOFF_MS[attempt] ?? 8000;
+      const retryAfterMs = (result as { retryAfterMs?: number }).retryAfterMs;
+      const delay = retryAfterMs ?? BACKOFF_MS[attempt] ?? 3000;
       logger.warn(
-        { status: result.status, attempt: attempt + 1, retryInMs: delay },
+        { status: result.status, attempt: attempt + 1, retryInMs: delay, retryAfterHeader: retryAfterMs != null },
         'upstream_stream_retrying',
       );
       await sleep(delay);
@@ -185,9 +302,25 @@ export class BluesmindsService {
 
   private async streamOnce(
     body: OpenAIChatCompletionsRequest,
-  ): Promise<{ ok: true; response: globalThis.Response; status: number } | { ok: false; status: number; body: unknown }> {
+    externalSignal?: AbortSignal,
+  ): Promise<{ ok: true; response: globalThis.Response; status: number } | { ok: false; status: number; body: unknown; retryAfterMs?: number }> {
     const url = `${this.baseUrl}/chat/completions`;
-    const controller = new AbortControllerWithTimeout(this.timeoutMs);
+
+    // Connect timeout: configurable via STREAM_CONNECT_TIMEOUT_MS (default 12s).
+    // Must be below the provider's own 15s stall ceiling.
+    const CONNECT_TIMEOUT_MS = getConfig().streamConnectTimeoutMs;
+    const connectController = new AbortControllerWithTimeout(CONNECT_TIMEOUT_MS);
+
+    // Merge with caller's abort signal if provided (idle timer, etc.)
+    let signal: AbortSignal = connectController.signal;
+    if (externalSignal) {
+      // Create a combined signal that fires when either aborts
+      const combined = AbortSignal.any
+        ? AbortSignal.any([connectController.signal, externalSignal])
+        : connectController.signal; // fallback for older Node — external signal used directly
+      signal = combined;
+    }
+
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -197,25 +330,36 @@ export class BluesmindsService {
           ...this.authHeader,
         },
         body: JSON.stringify({ ...body, stream: true }),
-        signal: controller.signal,
+        signal,
       });
+
+      // Connection established — clear the connect timeout. The caller's idle
+      // timer (externalSignal) now controls how long we wait for chunks.
+      connectController.clear();
 
       if (!res.ok) {
         const text = await res.text();
         let parsed: unknown = text;
         try { parsed = text ? JSON.parse(text) : null; } catch { /* keep text */ }
-        controller.clear();
-        return { ok: false, status: res.status, body: parsed };
+
+        // Read Retry-After for 429 responses
+        let retryAfterMs: number | undefined;
+        if (res.status === 429) {
+          const retryAfter = res.headers.get('retry-after');
+          if (retryAfter) {
+            const seconds = Number(retryAfter);
+            if (Number.isFinite(seconds) && seconds > 0) {
+              retryAfterMs = Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
+            }
+          }
+        }
+
+        return { ok: false, status: res.status, body: parsed, retryAfterMs };
       }
 
-      // Do NOT clear the controller here — the caller streams the response body
-      // and needs the abort signal to remain active. The caller is responsible
-      // for clearing the controller once it has finished reading the stream.
-      // We store it on the response object so the stream reader can clean it up.
-      (res as unknown as { __abortController?: AbortControllerWithTimeout }).__abortController = controller;
       return { ok: true, response: res, status: res.status };
     } catch (err) {
-      controller.clear();
+      connectController.clear();
       const isAbort =
         (err instanceof Error && err.name === 'AbortError') ||
         (err instanceof DOMException && err.name === 'AbortError');
@@ -225,7 +369,7 @@ export class BluesmindsService {
         body: {
           error: {
             message: isAbort
-              ? `Stream timed out after ${this.timeoutMs}ms`
+              ? `Stream connection timed out after ${CONNECT_TIMEOUT_MS}ms`
               : err instanceof Error ? err.message : String(err),
             type: isAbort ? 'timeout_error' : 'network_error',
           },

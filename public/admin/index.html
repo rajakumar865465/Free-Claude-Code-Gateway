@@ -721,10 +721,14 @@
                 <small class="help-text">Used when no specific mapping matches the incoming Claude model name.</small>
               </label>
             </div>
-            <div class="form-actions" style="margin-top:14px">
+            <div class="form-actions" style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
               <button class="btn btn-outline btn-sm" id="test-default-model" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 Test Default Model
+              </button>
+              <button class="btn btn-outline btn-sm" id="set-all-to-default-btn" type="button" title="Replace every mapping's Provider Model with the current Default Fallback Model value">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M17 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2z"/><polyline points="9 10 12 13 15 10"/><line x1="12" y1="6" x2="12" y2="13"/></svg>
+                Set All to Default
               </button>
             </div>
           </div>
@@ -820,6 +824,9 @@
                 <tbody id="router-family-tbody"></tbody>
               </table>
             </div>
+            <p class="help-text" style="margin-top:10px;padding:8px 12px;background:var(--primary-soft);border-radius:var(--radius-sm);color:var(--primary);font-size:12px">
+              💡 <strong>Backup model</strong> is tried automatically when the primary model returns a rate limit (429) or server error (500). Set it to a different model to enable instant failover without waiting.
+            </p>
           </div>
 
           <!-- Auto-Fallback Models -->

@@ -1,10 +1,11 @@
 import {
   loadModelConfig,
   resolveProviderModel,
+  resolveProviderModelWithBackup,
   resetModelConfigCache,
   DEFAULT_FAMILY_RULES,
 } from '../config/models';
-import type { FamilyRule, ModelMappingConfig } from '../types/config';
+import type { FamilyRule, ModelMappingConfig, ResolvedModel } from '../types/config';
 import { loadJson, saveJson } from './persist';
 import { buildSuggestions, computePrefixStyle, scoreMatch, CONFIDENCE_THRESHOLD } from './model-matcher';
 import type { AutoMapSuggestion, AutoMapResult } from '../types/config';
@@ -79,6 +80,10 @@ export class ModelRegistry {
 
   resolve(incoming: string | undefined, fallback: string, strict = false): string {
     return resolveProviderModel(incoming, this.currentConfig(), fallback, strict);
+  }
+
+  resolveWithBackup(incoming: string | undefined, fallback: string, strict = false): ResolvedModel {
+    return resolveProviderModelWithBackup(incoming, this.currentConfig(), fallback, strict);
   }
 
   // ── Exact mappings + default ──────────────────────────────────────────────

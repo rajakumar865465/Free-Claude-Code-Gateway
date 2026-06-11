@@ -14,6 +14,9 @@ export interface RequestLogEntry {
   latencyMs: number;
   streaming: boolean;
   error?: string;
+  cascadedToBackup?: boolean;
+  /** Set to 'non_stream' when streaming failed and a non-stream retry succeeded */
+  fallback?: 'non_stream';
 }
 
 export type RequestLogListener = (entry: RequestLogEntry) => void;
@@ -55,6 +58,8 @@ export class RequestLog {
       latencyMs: input.latencyMs,
       streaming: input.streaming,
       error: input.error,
+      cascadedToBackup: input.cascadedToBackup,
+      fallback: input.fallback,
     };
     this.buffer.push(entry);
     if (this.buffer.length > this.capacity) {

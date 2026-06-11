@@ -84,13 +84,16 @@ export function mapOpenAIErrorToAnthropic(err: OpenAIErrorResponse): AnthropicEr
   }
 
   if (status === 429 || RATE_LIMIT_KEYWORDS.some((k) => lower.includes(k))) {
+    const detail = message && message !== 'Unknown upstream error'
+      ? ` ${message}`
+      : ' Please wait and retry.';
     return {
       status: 429,
       body: {
         type: 'error',
         error: {
           type: 'rate_limit_error',
-          message: 'Rate limit reached. Please slow down and retry.',
+          message: `Rate limit reached.${detail}`,
         },
       },
     };

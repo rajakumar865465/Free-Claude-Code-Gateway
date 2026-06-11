@@ -16,6 +16,15 @@ export interface FamilyRule {
   backup?: string;
 }
 
+/** Result of a backup-aware model resolution. */
+export interface ResolvedModel {
+  /** The primary provider model to try first. */
+  primary: string;
+  /** The backup provider model to try if primary fails with a transient error (429/500/503/529).
+   *  null when no backup is configured (exact mappings, pass-through, default fallback). */
+  backup: string | null;
+}
+
 export interface AutoMapSuggestion {
   claudeModel: string;
   current: string;

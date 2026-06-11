@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { FamilyRule, ModelMappingConfig } from '../types/config';
+import type { FamilyRule, ModelMappingConfig, ResolvedModel } from '../types/config';
 
 // ---------------------------------------------------------------------------
 // Default config — all Claude models → z-ai/glm-5.1 (BluesMinds provider)
@@ -140,4 +140,48 @@ export function resolveProviderModel(
 export function resetModelConfigCache(): void {
   cachedConfig = null;
   cachedFilePath = null;
+}
+
+// ---------------------------------------------------------------------------
+// Backup-aware resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Like resolveProviderModel but also returns the backup model from the matched
+ * family rule (if any). Exact mappings and pass-through have no backup.
+ */
+export function resolveProviderModelWithBackup(
+  incoming: string | undefined,
+  cfg: ModelMappingConfig,
+  fallback: string,
+  strict = false,
+): ResolvedModel {
+  // 1. Exact mapping — no backup concept for exact entries
+  if (incoming && cfg.anthropic_to_bluesminds[incoming]) {
+    return { primary: cfg.anthropic_to_bluesminds[incoming], backup: null };
+  }
+
+  // 2. Family rules (pattern matching) — backup comes from rule
+  if (incoming && !strict && cfg.family_rules && cfg.family_rules.length > 0) {
+    for (const rule of cfg.family_rules) {
+      if (rule.pattern && globMatch(rule.pattern, incoming)) {
+        const backup = (rule.backup && rule.backup !== rule.primary) ? rule.backup : null;
+        return { primary: rule.primary, backup };
+      }
+    }
+  }
+
+  // 3. Strict mode — reject unknown models
+  if (incoming && strict) {
+    throw new Error(
+      `Model "${incoming}" is not in the strict mapping. Add it to config/models.json.`,
+    );
+  }
+
+  // 4. Non-strict pass-through
+  if (incoming) return { primary: incoming, backup: null };
+
+  // 5. Use fallback default
+  if (fallback) return { primary: fallback, backup: null };
+  throw new Error('No model specified and DEFAULT_MODEL is not set.');
 }

@@ -1666,7 +1666,7 @@
         <td class="col-endpoint ${endpointClass}"><code>${escapeHtml(endpointShort)}</code></td>
         <td class="col-model ${r.clientModel ? '' : 'empty'}">${escapeHtml(r.clientModel || '—')}</td>
         <td class="col-model mono">${escapeHtml(r.resolvedModel || '—')}</td>
-        <td class="col-provider"><span class="mapping-provider-badge">${escapeHtml(r.provider || 'upstream')}</span></td>
+        <td class="col-provider"><span class="mapping-provider-badge">${escapeHtml(r.provider || 'upstream')}</span>${r.cascadedToBackup ? '<span class="badge badge-warning" style="margin-left:4px;font-size:10px" title="Primary model was rate-limited or overloaded — request served by backup model">↻ backup</span>' : ''}</td>
         <td class="col-tokens num">${hasTokens ? fmtTokensShort(inTok, outTok) : '—'}${hasTokens ? `<span class="col-tokens-detail">${fmt.n(inTok)} in · ${fmt.n(outTok)} out</span>` : ''}</td>
         <td class="col-latency ${latClass} num">${fmtLatencyShort(lat)}${latHealth ? `<span class="col-latency-detail">${latHealth}</span>` : ''}</td>
         <td class="col-stream">${r.streaming ? '<span class="stream-pill">stream</span>' : '<span class="stream-pill no">sync</span>'}</td>
@@ -2690,7 +2690,9 @@
     const btn = $('#auto-map-btn');
     if (btn) btn.classList.add('btn-loading');
     try {
-      const data = await api('POST', '/models/auto-map');
+      const data = await api('POST', '/models/auto-map', {
+        defaultModel: ($('#default-model-input')?.value || '').trim() || undefined,
+      });
       state.suggestions = data.suggestions || [];
       state.defaultSuggestion = data.defaultSuggestion || null;
       state.prefixStyle = data.prefixStyle || null;
@@ -2871,16 +2873,17 @@
           { name: 'Claude Other', pattern: 'claude*',        primary: defaultModel, backup: defaultModel },
           { name: 'Default',      pattern: '*',              primary: defaultModel, backup: '—' },
         ];
-    tbody.innerHTML = rules.map((r) => `<tr>
+    tbody.innerHTML = rules.map((r, i) => `<tr data-rule-index="${i}">
       <td class="router-family-name">${escapeHtml(r.name)}</td>
       <td class="router-family-pattern"><code>${escapeHtml(r.pattern)}</code></td>
-      <td class="router-family-primary">${escapeHtml(r.primary)}</td>
-      <td class="router-family-backup">${escapeHtml(r.backup)}</td>
+      <td class="router-family-primary">
+        <input class="mapping-input family-primary-input" data-rule-index="${i}" value="${escapeAttr(r.primary)}" placeholder="provider-model" list="provider-models-list" style="width:100%;min-width:140px" />
+      </td>
+      <td class="router-family-backup">
+        <input class="mapping-input family-backup-input" data-rule-index="${i}" value="${escapeAttr(r.backup === '—' ? '' : r.backup)}" placeholder="backup model (optional)" list="provider-models-list" style="width:100%;min-width:140px" />
+      </td>
       <td class="col-action">
         <div class="mapping-row-actions">
-          <button class="icon-btn" data-family-action="edit" data-family="${escapeAttr(r.name)}" aria-label="Edit rule" title="Edit rule">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          </button>
           <button class="icon-btn" data-family-action="test" data-family="${escapeAttr(r.name)}" aria-label="Test rule" title="Test rule">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -2902,8 +2905,19 @@
             const pgModel = $('#pg-model');
             if (pgModel) pgModel.value = rule.primary;
           }, 250);
-        } else if (act === 'edit') {
-          toast(`Editing family rules is not supported in this build. Use exact mappings for custom routes.`, 'info', 'Info');
+        }
+      });
+    });
+
+    /* Wire live edits — update state.familyRules when inputs change */
+    tbody.querySelectorAll('.family-primary-input, .family-backup-input').forEach((inp) => {
+      inp.addEventListener('change', () => {
+        const idx = parseInt(inp.getAttribute('data-rule-index') || '0', 10);
+        if (!state.familyRules[idx]) return;
+        if (inp.classList.contains('family-primary-input')) {
+          state.familyRules[idx].primary = inp.value.trim() || state.familyRules[idx].primary;
+        } else {
+          state.familyRules[idx].backup = inp.value.trim() || undefined;
         }
       });
     });
@@ -3204,20 +3218,47 @@
       status.textContent = ''; status.className = 'status-line';
       saveMappingsBtn.classList.add('btn-loading');
       try {
+        // Save exact mappings + default
         const updated = await api('PUT', '/models/mappings', { mappings: state.mappings, default: $('#default-model-input').value.trim() });
         state.mappings = updated.mappings || {};
         state.savedMappings = { ...(updated.mappings || {}) };
         state.defaultModel = updated.default || '';
         state.suggestions = [];
         state.defaultSuggestion = null;
+
+        // Also save family rules — collect latest values directly from the rendered inputs
+        // so we capture any edits the user made in the table before hitting Save Router
+        const familyInputRows = document.querySelectorAll('#router-family-tbody tr[data-rule-index]');
+        if (familyInputRows.length > 0) {
+          const rulesPayload = Array.from(familyInputRows).map((row) => {
+            const idx = parseInt(row.getAttribute('data-rule-index') || '0', 10);
+            const base = state.familyRules[idx] || {};
+            const primaryInp = row.querySelector('.family-primary-input');
+            const backupInp = row.querySelector('.family-backup-input');
+            const rule = {
+              name: base.name || '',
+              pattern: base.pattern || '',
+              primary: (primaryInp ? primaryInp.value.trim() : '') || base.primary || '',
+            };
+            const backupVal = backupInp ? backupInp.value.trim() : '';
+            if (backupVal) rule.backup = backupVal;
+            return rule;
+          }).filter((r) => r.name && r.pattern && r.primary);
+
+          if (rulesPayload.length > 0) {
+            const rulesUpdated = await api('PUT', '/models/family-rules', rulesPayload);
+            state.familyRules = rulesUpdated.familyRules || state.familyRules;
+          }
+        }
+
         renderMappingsTable();
         renderApplySuggestionsBar();
         renderRouterHealth();
         renderFamilyRules();
         renderAutoFallback();
         renderAvailableModels();
-        status.textContent = '✓ Mappings saved'; status.classList.add('ok');
-        toast('Model mappings saved', 'ok', 'Saved');
+        status.textContent = '✓ Router saved'; status.classList.add('ok');
+        toast('Model router saved (mappings + family rules)', 'ok', 'Saved');
       } catch (err) {
         status.textContent = err.message; status.classList.add('err');
         toast(err.message, 'error', 'Save failed');
@@ -3237,6 +3278,31 @@
         if (pgModel) pgModel.value = $('#default-model-input')?.value || '';
         if (pgMessage) pgMessage.value = 'Hello from the default model test.';
       }, 250);
+    });
+  }
+
+  /* Set All to Default — replace every mapping's provider model with the current default fallback */
+  const setAllToDefaultBtn = $('#set-all-to-default-btn');
+  if (setAllToDefaultBtn) {
+    setAllToDefaultBtn.addEventListener('click', () => {
+      const defaultValue = ($('#default-model-input')?.value || '').trim();
+      if (!defaultValue) {
+        toast('Set a Default Fallback Model first.', 'warn', 'Nothing to apply');
+        return;
+      }
+      const count = Object.keys(state.mappings || {}).length;
+      if (count === 0) {
+        toast('No mappings to update.', 'info', 'Nothing to apply');
+        return;
+      }
+      if (!confirm(`Replace all ${count} mapping(s) with "${defaultValue}"? Click Save Router to persist.`)) return;
+      rebuildMappingFromTable();
+      for (const key of Object.keys(state.mappings)) {
+        state.mappings[key] = defaultValue;
+      }
+      renderMappingsTable();
+      renderRouterHealth();
+      toast(`${count} mapping${count === 1 ? '' : 's'} set to "${defaultValue}". Click Save Router to persist.`, 'ok', 'Updated');
     });
   }
 
