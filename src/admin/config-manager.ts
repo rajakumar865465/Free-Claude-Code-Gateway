@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { getConfig, resetConfigCache } from '../config/env';
 import { loadJson, saveJson } from './persist';
 import { setLogLevel } from '../utils/logger';
+import type { ProviderManager } from './provider-manager';
 
 export interface RuntimeConfig {
   bluesmindsBaseUrl: string;
@@ -76,8 +77,10 @@ export class ConfigManager {
   private outputPriceOverride: number | undefined = undefined;
   private _restartRequired = false;
   private _restartReasons: string[] = [];
+  private readonly providerManager?: ProviderManager;
 
-  constructor() {
+  constructor(providerManager?: ProviderManager) {
+    this.providerManager = providerManager;
     const stored = loadJson<StoredConfig>(STORAGE_KEY, {});
     if (stored.apiKey !== undefined) this.apiKeyOverride = stored.apiKey;
     if (stored.baseUrl !== undefined) this.baseUrlOverride = stored.baseUrl;
@@ -98,16 +101,31 @@ export class ConfigManager {
   }
 
   getApiKey(): string {
+    // Active provider takes highest priority
+    if (this.providerManager) {
+      const activeKey = this.providerManager.getActiveApiKey();
+      if (activeKey) return activeKey;
+    }
     if (this.apiKeyOverride !== undefined) return this.apiKeyOverride;
     return getConfig().bluesmindsApiKey;
   }
 
   getBaseUrl(): string {
+    // Active provider takes highest priority
+    if (this.providerManager) {
+      const active = this.providerManager.getActive();
+      if (active) return active.baseUrl.replace(/\/+$/, '');
+    }
     const v = this.baseUrlOverride ?? getConfig().bluesmindsBaseUrl;
     return v.replace(/\/+$/, '');
   }
 
   getDefaultModel(): string {
+    // Active provider takes highest priority
+    if (this.providerManager) {
+      const active = this.providerManager.getActive();
+      if (active && active.defaultModel) return active.defaultModel;
+    }
     return this.defaultModelOverride ?? getConfig().defaultModel;
   }
 

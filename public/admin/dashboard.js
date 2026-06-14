@@ -191,6 +191,7 @@
     models: ['Model Router', 'Map Claude model names to provider models with fallback routing.'],
     settings: ['Gateway Settings', 'Configure provider connection, security, rate limits, and behavior.'],
     diagnostics: ['Provider Diagnostics', 'Step-by-step checks for provider connectivity and translation.'],
+    context: ['Auto-Compact Context', 'Track token usage, auto-compact conversations, and preserve session state.'],
   };
 
   function switchView(view) {
@@ -214,9 +215,15 @@
     staggerView(viewEl);
 
     if (view === 'models') loadMappings();
-    if (view === 'settings') { loadConfig(); loadOperations(); }
+    if (view === 'settings') { loadConfig(); loadOperations(); lciLoadStatus(); }
+
     if (view === 'providers') renderProviders();
     if (view === 'diagnostics') resetDiagnostics();
+    if (view === 'context') {
+      // Context page loaded via the module's own handler registered with data-view="context" clicks
+      // Also call it directly here as a safety net
+      if (typeof window.__loadContextPage === 'function') window.__loadContextPage();
+    }
     if (view === 'overview') {
       loadStats();
       renderSetupChecklist();
@@ -2450,6 +2457,223 @@
   }
 
   /* ══════════════════════════════════════════════════════════════════
+     SECTION 18c — Local Claude Integration (LCI)
+     Checks and auto-configures ~/.claude.json to use this proxy.
+     ══════════════════════════════════════════════════════════════════ */
+
+  function lciIconSvg(type) {
+    if (type === 'ok') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    if (type === 'warn') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+  }
+
+  function renderLciCard(data) {
+    const card = $('#lci-status-card');
+    const configureBtn = $('#lci-configure-btn');
+    if (!card) return;
+
+    let cardClass = 'lci-unconfigured';
+    let iconType = 'err';
+    let badgeClass = 'err';
+    let badgeText = 'Not Configured';
+    let titleText = 'Claude Code is NOT using this proxy';
+    let descHtml = '';
+    let showConfigureBtn = true;
+
+    if (data.configured) {
+      cardClass = 'lci-configured';
+      iconType = 'ok';
+      badgeClass = 'ok';
+      badgeText = 'Configured';
+      titleText = 'Claude Code is using this proxy';
+      showConfigureBtn = false;
+    } else if (data.partial) {
+      cardClass = 'lci-partial';
+      iconType = 'warn';
+      badgeClass = 'warn';
+      badgeText = 'Different URL';
+      titleText = 'Claude Code is pointing to a different proxy';
+    } else if (!data.fileExists) {
+      titleText = 'No ~/.claude.json found';
+      descHtml = `<p class="lci-desc">Click <strong>Auto-Configure Claude</strong> to create it and point Claude Code at this proxy.</p>`;
+    } else if (!data.readable) {
+      cardClass = 'lci-partial';
+      iconType = 'warn';
+      badgeClass = 'warn';
+      badgeText = 'Read Error';
+      titleText = 'Cannot read ~/.claude.json';
+      showConfigureBtn = false;
+    }
+
+    // Build URL chips
+    let urlChips = '';
+    if (data.currentBaseUrl && !data.configured) {
+      urlChips += `<span class="lci-url-chip warn"><span class="lci-url-chip-dot"></span><span class="lci-url-chip-label">Current:</span>${escapeHtml(data.currentBaseUrl)}</span>`;
+    }
+    if (data.proxyBaseUrl) {
+      const chipClass = data.configured ? 'ok' : '';
+      urlChips += `<span class="lci-url-chip ${chipClass}"><span class="lci-url-chip-dot"></span><span class="lci-url-chip-label">Proxy:</span>${escapeHtml(data.proxyBaseUrl)}</span>`;
+    }
+
+    // Default description if not set
+    if (!descHtml && data.configured) {
+      descHtml = `<p class="lci-desc">All Claude Code requests are routed through this gateway. Model: <code>${escapeHtml(data.currentModel || '—')}</code></p>`;
+    } else if (!descHtml && data.partial) {
+      descHtml = `<p class="lci-desc">Claude Code has a different base URL configured. Click <strong>Auto-Configure Claude</strong> to update it to this proxy.</p>`;
+    } else if (!descHtml) {
+      descHtml = `<p class="lci-desc">Click <strong>Auto-Configure Claude</strong> to set ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, and ANTHROPIC_MODEL.</p>`;
+    }
+
+    card.className = `lci-status-card ${cardClass}`;
+    card.innerHTML = `
+      <div class="lci-status-card-inner">
+        <div class="lci-icon ${iconType}">${lciIconSvg(iconType)}</div>
+        <div class="lci-info">
+          <div class="lci-title">
+            ${escapeHtml(titleText)}
+            <span class="lci-badge ${badgeClass}">${escapeHtml(badgeText)}</span>
+          </div>
+          ${descHtml}
+          ${urlChips ? `<div class="lci-url-row">${urlChips}</div>` : ''}
+          <div class="lci-path-row" style="margin-top:${urlChips ? '8px' : '0'}">
+            <span class="lci-path-label">Config</span>
+            <span class="lci-path-value" title="${escapeHtml(data.claudeJsonPath || '')}">${escapeHtml(data.claudeJsonPath || '~/.claude.json')}</span>
+          </div>
+        </div>
+      </div>`;
+
+    if (configureBtn) {
+      configureBtn.disabled = !showConfigureBtn;
+    }
+    const openBtn = $('#lci-open-btn');
+    if (openBtn) {
+      openBtn.disabled = !data.fileExists;
+    }
+  }
+
+  async function lciLoadStatus(silent = false) {
+    const card = $('#lci-status-card');
+    if (!card) return;
+
+    if (!silent) {
+      card.className = 'lci-status-card';
+      card.innerHTML = `<div class="lci-status-card-inner lci-loading"><span class="lci-spinner"></span><span class="lci-status-text">Checking configuration…</span></div>`;
+      const configureBtn = $('#lci-configure-btn');
+      if (configureBtn) configureBtn.disabled = true;
+    }
+
+    try {
+      const data = await api('GET', '/claude-local/status');
+      renderLciCard(data);
+    } catch (err) {
+      if (card) {
+        card.className = 'lci-status-card lci-unconfigured';
+        card.innerHTML = `<div class="lci-status-card-inner"><div class="lci-icon err">${lciIconSvg('err')}</div><div class="lci-info"><div class="lci-title">Status check failed</div><p class="lci-desc">${escapeHtml(err.message)}</p></div></div>`;
+      }
+    }
+  }
+
+  // Note: lciLoadStatus() is called from switchView() whenever Settings view is opened.
+
+  // Test button
+  const lciTestBtn = $('#lci-test-btn');
+  if (lciTestBtn) {
+    lciTestBtn.addEventListener('click', async () => {
+      lciTestBtn.classList.add('btn-loading');
+      lciTestBtn.disabled = true;
+      const resultEl = $('#lci-result');
+      if (resultEl) resultEl.hidden = true;
+      try {
+        await lciLoadStatus(false);
+        toast('Configuration check complete', 'ok', 'LCI Test');
+      } finally {
+        lciTestBtn.classList.remove('btn-loading');
+        lciTestBtn.disabled = false;
+      }
+    });
+  }
+
+  // Open File button
+  const lciOpenBtn = $('#lci-open-btn');
+  if (lciOpenBtn) {
+    lciOpenBtn.addEventListener('click', async () => {
+      lciOpenBtn.classList.add('btn-loading');
+      lciOpenBtn.disabled = true;
+      try {
+        await api('POST', '/claude-local/open');
+        toast('Opened ~/.claude.json in Notepad', 'ok');
+      } catch (err) {
+        toast('Failed to open file: ' + err.message, 'err');
+      } finally {
+        lciOpenBtn.classList.remove('btn-loading');
+        lciOpenBtn.disabled = false;
+      }
+    });
+  }
+
+  // Auto-Configure button
+  const lciConfigureBtn = $('#lci-configure-btn');
+  if (lciConfigureBtn) {
+    lciConfigureBtn.addEventListener('click', async () => {
+      lciConfigureBtn.classList.add('btn-loading');
+      lciConfigureBtn.disabled = true;
+      const resultEl = $('#lci-result');
+      if (resultEl) {
+        resultEl.hidden = false;
+        resultEl.className = 'test-result';
+        resultEl.innerHTML = `<p style="color:var(--text-muted)">Writing ~/.claude.json…</p>`;
+      }
+      try {
+        const data = await api('POST', '/claude-local/configure');
+        if (data.ok) {
+          if (resultEl) {
+            resultEl.classList.add('ok');
+            resultEl.innerHTML = `
+              <div class="test-result-head">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <strong>Claude Code configured successfully!</strong>
+              </div>
+              <div class="test-result-meta">
+                <span>File: <code>${escapeHtml(data.claudeJsonPath)}</code></span>
+                <span>Base URL: <code>${escapeHtml(data.written?.ANTHROPIC_BASE_URL || '')}</code></span>
+                <span>Model: <code>${escapeHtml(data.written?.ANTHROPIC_MODEL || '')}</code></span>
+              </div>
+              <p style="margin:8px 0 0; font-size:12px; color:var(--text-secondary)">
+                Restart Claude Code for the changes to take effect.
+              </p>`;
+          }
+          toast('~/.claude.json updated — restart Claude Code', 'ok', 'Configured!');
+          // Refresh status card
+          await lciLoadStatus(true);
+        }
+      } catch (err) {
+        if (resultEl) {
+          resultEl.classList.add('err');
+          resultEl.innerHTML = `
+            <div class="test-result-head">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--err)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              <strong>Configure failed</strong>
+            </div>
+            <pre>${escapeHtml(err.message)}</pre>`;
+        }
+        toast(`Auto-configure failed: ${err.message}`, 'error', 'LCI Error');
+      } finally {
+        lciConfigureBtn.classList.remove('btn-loading');
+        // Re-check status to update button state
+        await lciLoadStatus(true);
+      }
+    });
+  }
+
+  // Also trigger status load when settings nav item is clicked directly
+  const settingsNavItem = document.querySelector('[data-view="settings"]');
+  if (settingsNavItem) {
+    settingsNavItem.addEventListener('click', () => {
+      setTimeout(() => lciLoadStatus(), 100);
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
      SECTION 19 — Model Mappings (Router)
      ══════════════════════════════════════════════════════════════════ */
 
@@ -3259,6 +3483,13 @@
         renderAvailableModels();
         status.textContent = '✓ Router saved'; status.classList.add('ok');
         toast('Model router saved (mappings + family rules)', 'ok', 'Saved');
+
+        // ── Auto-snapshot for active provider ──────────────────
+        // Silently save the current router state against the active provider
+        // so switching away and back restores these exact mappings.
+        if (providerState.activeId) {
+          api('POST', `/providers/${providerState.activeId}/save-snapshot`).catch(() => {});
+        }
       } catch (err) {
         status.textContent = err.message; status.classList.add('err');
         toast(err.message, 'error', 'Save failed');
@@ -3759,94 +3990,842 @@
   }
 
   /* ══════════════════════════════════════════════════════════════════
-     SECTION 22 — Providers
+     SECTION 22 — Providers (full multi-provider management)
      ══════════════════════════════════════════════════════════════════ */
-  function renderProviders() {
-    const grid = $('#provider-grid');
-    if (!grid) return;
-    const baseUrl = state.lastConfig?.bluesmindsBaseUrl || '—';
-    const apiKeySet = state.lastConfig?.apiKeySet || false;
-    const defaultModel = state.lastConfig?.defaultModel || '—';
-    const reqCount = state.lastStats?.overall?.totalRequests || 0;
-    const errCount = state.lastStats?.overall?.errorCount || 0;
-    const successCount = state.lastStats?.overall?.successCount || 0;
-    const errorRate = state.lastStats?.overall?.errorRate || 0;
-    const medianLat = state.lastStats?.overall?.medianLatencyMs || 0;
 
-    grid.innerHTML = `
-      <div class="provider-card active stagger-item">
-        <div class="provider-header">
-          <div class="provider-icon">AI</div>
-          <div class="provider-info">
-            <div class="provider-name">Upstream Provider</div>
-            <div class="provider-url">${escapeHtml(baseUrl)}</div>
+  // Internal providers state
+  const providerState = {
+    providers: [],   // ProviderSnapshot[]
+    activeId: null,  // string | null
+  };
+
+  // ── Helpers ───────────────────────────────────────────────────
+
+  function providerInitials(name) {
+    if (!name) return '?';
+    const words = name.trim().split(/\s+/);
+    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  }
+
+  function providerAvatarColor(id) {
+    // Deterministic color from id
+    const palette = [
+      '#2563EB', '#7C3AED', '#10B981', '#F59E0B',
+      '#EF4444', '#06B6D4', '#EC4899', '#6366F1',
+    ];
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0;
+    return palette[Math.abs(hash) % palette.length];
+  }
+
+  // ── Render active banner ──────────────────────────────────────
+
+  function renderActiveBanner() {
+    const banner = $('#provider-active-banner');
+    if (!banner) return;
+    if (!providerState.activeId) {
+      banner.style.display = 'none';
+      return;
+    }
+    const p = providerState.providers.find((x) => x.id === providerState.activeId);
+    if (!p) { banner.style.display = 'none'; return; }
+    banner.style.display = 'flex';
+    const nameEl = $('#provider-active-name');
+    const metaEl = $('#provider-active-meta');
+    if (nameEl) nameEl.textContent = p.name;
+    if (metaEl) metaEl.textContent = `· ${p.defaultModel} · ${p.baseUrl}`;
+  }
+
+  // ── Render cards ──────────────────────────────────────────────
+
+  function renderProviderCards() {
+    const container = $('#provider-cards');
+    const emptyEl = $('#provider-empty');
+    if (!container) return;
+
+    if (providerState.providers.length === 0) {
+      container.innerHTML = '';
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      return;
+    }
+    if (emptyEl) emptyEl.classList.add('hidden');
+
+    container.innerHTML = providerState.providers.map((p) => {
+      const isActive = p.id === providerState.activeId;
+      const color = providerAvatarColor(p.id);
+      const initials = escapeHtml(providerInitials(p.name));
+
+      const activeBadge = isActive
+        ? `<span class="provider-active-badge">Live</span>`
+        : '';
+
+      const activateOrActive = isActive
+        ? `<button class="pc-btn pc-active-indicator" type="button" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Active
+           </button>`
+        : `<button class="pc-btn pc-activate" data-action="activate" data-id="${escapeAttr(p.id)}" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Set Active
+           </button>`;
+
+      return `
+        <div class="provider-card stagger-item${isActive ? ' is-active' : ''}" data-id="${escapeAttr(p.id)}">
+          <div class="provider-card-body">
+
+            <!-- Header -->
+            <div class="provider-card-header">
+              <div class="provider-card-avatar" style="background:${color}">${initials}</div>
+              <div class="provider-card-meta">
+                <div class="provider-card-name-row">
+                  <span class="provider-card-name" title="${escapeAttr(p.name)}">${escapeHtml(p.name)}</span>
+                  ${activeBadge}
+                </div>
+                <span class="provider-card-url" title="${escapeAttr(p.baseUrl)}">${escapeHtml(p.baseUrl)}</span>
+              </div>
+            </div>
+
+            <!-- Info chips -->
+            <div class="provider-card-info-grid">
+              <div class="provider-info-chip">
+                <span class="provider-info-chip-label">Default Model</span>
+                <span class="provider-info-chip-value" title="${escapeAttr(p.defaultModel)}">${escapeHtml(p.defaultModel) || '—'}</span>
+              </div>
+              <div class="provider-info-chip">
+                <span class="provider-info-chip-label">API Key</span>
+                <span class="provider-info-chip-value ${p.apiKeySet ? 'key-set' : 'key-missing'}">
+                  ${p.apiKeySet ? escapeHtml(p.apiKeyPreview) : 'Not set'}
+                </span>
+              </div>
+            </div>
+
+            ${p.notes ? `<div class="provider-card-notes-row" title="${escapeAttr(p.notes)}">💬 ${escapeHtml(p.notes)}</div>` : ''}
+
           </div>
-          <div class="provider-status">
-            <span class="status-dot live"></span>
-            <span style="font-size:12px; font-weight:600; color:var(--ok)">${apiKeySet ? 'Connected' : 'No key'}</span>
+
+          <!-- Footer action bar -->
+          <div class="provider-card-footer">
+            ${activateOrActive}
+            <button class="pc-btn" data-action="test" data-id="${escapeAttr(p.id)}" type="button" title="Test connection">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              Test
+            </button>
+            <button class="pc-btn" data-action="sync" data-id="${escapeAttr(p.id)}" type="button" title="Sync models">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+              Sync
+            </button>
+            <button class="pc-btn" data-action="edit" data-id="${escapeAttr(p.id)}" type="button" title="Edit provider">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit
+            </button>
+            <button class="pc-btn pc-delete" data-action="delete" data-id="${escapeAttr(p.id)}" type="button" title="Delete provider">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </button>
           </div>
         </div>
-        <div class="provider-stats">
-          <div class="provider-stat">
-            <div class="provider-stat-label">Requests</div>
-            <div class="provider-stat-value">${fmt.n(reqCount)}</div>
-          </div>
-          <div class="provider-stat">
-            <div class="provider-stat-label">Success</div>
-            <div class="provider-stat-value" style="color:var(--ok)">${fmt.n(successCount)}</div>
-          </div>
-          <div class="provider-stat">
-            <div class="provider-stat-label">Errors</div>
-            <div class="provider-stat-value" style="color:${errCount > 0 ? 'var(--err)' : 'var(--text-muted)'}">${fmt.n(errCount)}</div>
-          </div>
-          <div class="provider-stat">
-            <div class="provider-stat-label">Med. Latency</div>
-            <div class="provider-stat-value">${fmt.n(medianLat)} ms</div>
-          </div>
-        </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--text-muted)">
-          <span>Default model: <code style="font-size:11.5px">${escapeHtml(defaultModel)}</code></span>
-          <span>Error rate: <strong style="color:${errorRate > 5 ? 'var(--err)' : 'var(--ok)'}">${fmt.pct(errorRate)}</strong></span>
-        </div>
-        <div class="provider-actions">
-          <button class="btn btn-outline btn-sm" id="provider-test-this" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            Test
-          </button>
-          <button class="btn btn-outline btn-sm" id="provider-fetch-this" type="button">Sync Models</button>
-          <button class="btn btn-outline btn-sm" id="provider-edit" type="button">Edit</button>
-        </div>
+      `;
+    }).join('');
+
+    // Bind card actions
+    container.querySelectorAll('[data-action]').forEach((btn) => {
+      btn.addEventListener('click', handleProviderCardAction);
+    });
+  }
+
+  // ── Card action handler ───────────────────────────────────────
+
+  async function handleProviderCardAction(e) {
+    const btn = e.currentTarget;
+    const action = btn.getAttribute('data-action');
+    const id = btn.getAttribute('data-id');
+    if (!action || !id) return;
+
+    if (action === 'activate') {
+      btn.disabled = true;
+      btn.textContent = 'Activating…';
+      try {
+        const data = await api('POST', `/providers/${id}/activate`);
+        providerState.activeId = data.activeId;
+        renderActiveBanner();
+        renderProviderCards();
+        loadConfig();
+        if (typeof window.__refreshProviderSwitcher === 'function') {
+          window.__refreshProviderSwitcher();
+        }
+        if (data.restored) {
+          // Snapshot was restored immediately — reload mappings right away
+          if (typeof loadMappings === 'function') await loadMappings();
+          const p = providerState.providers.find((x) => x.id === id);
+          toast(`Switched to ${p?.name || 'provider'}. Your saved mappings have been restored.`, 'ok', 'Provider Restored');
+        } else {
+          toast(`Switched to provider. Syncing model mappings…`, 'ok', 'Provider Switched');
+          // New provider — wait for background remap then reload
+          setTimeout(async () => {
+            if (typeof loadMappings === 'function') {
+              await loadMappings();
+              toast('Model Router updated to new provider.', 'ok', 'Mappings Updated');
+            }
+          }, 2500);
+        }
+      } catch (err) {
+        toast(err.message || 'Failed to activate provider.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Set Active';
+      }
+      return;
+    }
+
+    if (action === 'test') {
+      const card = btn.closest('.provider-card');
+      btn.disabled = true;
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="animation:spin 1s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Testing…';
+      try {
+        const result = await api('POST', `/providers/${id}/test`);
+        if (result.success) {
+          toast(`Connected in ${result.latencyMs}ms${result.preview ? ` · "${result.preview.slice(0, 60)}"` : ''}`, 'ok', 'Connection OK');
+        } else {
+          toast(result.error || 'Connection failed', 'error', 'Test Failed');
+        }
+      } catch (err) {
+        toast(err.message || 'Test request failed.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Test';      }
+      return;
+    }
+
+    if (action === 'sync') {
+      btn.disabled = true;
+      btn.textContent = 'Syncing…';
+      try {
+        const result = await api('POST', `/providers/${id}/sync-models`);
+        if (result.remapped) {
+          // Active provider — all mappings + family rules updated
+          toast(
+            `Synced ${result.models.length} models · all mappings updated to ${escapeHtml(result.target)}`,
+            'ok',
+            'Sync Complete',
+          );
+          // Reload Model Router to reflect updated mappings
+          if (typeof loadMappings === 'function') await loadMappings();
+          // Auto-save snapshot for this provider
+          if (providerState.activeId === id) {
+            api('POST', `/providers/${id}/save-snapshot`).catch(() => {});
+          }
+        } else {
+          toast(`Synced ${result.models.length} models from provider.`, 'ok', 'Models Synced');
+        }
+      } catch (err) {
+        toast(err.message || 'Sync failed.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Sync';
+      }
+      return;
+    }
+
+    if (action === 'edit') {
+      const p = providerState.providers.find((x) => x.id === id);
+      if (p) openProviderModal(p);
+      return;
+    }
+
+    if (action === 'delete') {
+      if (!confirm(`Delete provider "${providerState.providers.find((x) => x.id === id)?.name}"?\nThis cannot be undone.`)) return;
+      btn.disabled = true;
+      try {
+        await api('DELETE', `/providers/${id}`);
+        providerState.providers = providerState.providers.filter((x) => x.id !== id);
+        renderActiveBanner();
+        renderProviderCards();
+        toast('Provider deleted.', 'ok');
+      } catch (err) {
+        toast(err.message || 'Delete failed.', 'error');
+        btn.disabled = false;
+      }
+      return;
+    }
+  }
+
+  // ── Load providers from API ───────────────────────────────────
+
+  async function loadProviders() {
+    try {
+      const data = await api('GET', '/providers');
+      providerState.providers = data.providers || [];
+      providerState.activeId = data.activeId || null;
+    } catch (err) {
+      providerState.providers = [];
+      providerState.activeId = null;
+    }
+    renderActiveBanner();
+    renderProviderCards();
+    if (typeof window.__refreshProviderSwitcher === 'function') {
+      window.__refreshProviderSwitcher();
+    }
+  }
+
+  // ── Main renderProviders (called on view switch) ──────────────
+
+  function renderProviders() {
+    loadProviders();
+  }
+
+  // ── Deactivate btn ────────────────────────────────────────────
+
+  const providerDeactivateBtn = $('#provider-deactivate-btn');
+  if (providerDeactivateBtn) {
+    providerDeactivateBtn.addEventListener('click', async () => {
+      try {
+        await api('POST', '/providers/deactivate');
+        providerState.activeId = null;
+        renderActiveBanner();
+        renderProviderCards();
+        toast('Reverted to .env defaults.', 'info');
+        loadConfig();
+      } catch (err) {
+        toast(err.message || 'Failed to deactivate.', 'error');
+      }
+    });
+  }
+
+  // ── Add Provider btn ──────────────────────────────────────────
+
+  const providerAddBtn = $('#provider-add-btn');
+  if (providerAddBtn) providerAddBtn.addEventListener('click', () => openProviderModal(null));
+
+  const providerEmptyAdd = $('#provider-empty-add');
+  if (providerEmptyAdd) providerEmptyAdd.addEventListener('click', () => openProviderModal(null));
+
+  // ── Modal open / close ────────────────────────────────────────
+
+  function openProviderModal(provider) {
+    const overlay = $('#provider-modal-overlay');
+    const title = $('#provider-modal-title');
+    const idInput = $('#provider-modal-id');
+    const nameInput = $('#pf-name');
+    const urlInput = $('#pf-baseurl');
+    const keyInput = $('#pf-apikey');
+    const modelInput = $('#pf-model');
+    const notesInput = $('#pf-notes');
+    const keyHint = $('#pf-apikey-hint');
+    const testResult = $('#pf-test-result');
+    if (!overlay) return;
+
+    if (provider) {
+      title.textContent = 'Edit Provider';
+      idInput.value = provider.id;
+      nameInput.value = provider.name;
+      urlInput.value = provider.baseUrl;
+      keyInput.value = '';           // never pre-fill key
+      keyInput.placeholder = provider.apiKeySet ? '(unchanged — enter new key to replace)' : 'sk-…';
+      modelInput.value = provider.defaultModel;
+      notesInput.value = provider.notes || '';
+      if (keyHint) keyHint.textContent = 'Leave blank to keep existing key.';
+    } else {
+      title.textContent = 'Add Provider';
+      idInput.value = '';
+      nameInput.value = '';
+      urlInput.value = '';
+      keyInput.value = '';
+      keyInput.placeholder = 'sk-…';
+      modelInput.value = '';
+      notesInput.value = '';
+      if (keyHint) keyHint.textContent = 'Your API key is stored locally and never sent to the browser in full.';
+    }
+
+    if (testResult) { testResult.textContent = ''; testResult.className = 'pf-test-result'; }
+    overlay.classList.remove('hidden');
+    setTimeout(() => nameInput?.focus(), 80);
+    // Reset model combo so stale models from previous session don't show
+    if (typeof resetModelCombo === 'function') resetModelCombo();
+  }
+
+  function closeProviderModal() {
+    const overlay = $('#provider-modal-overlay');
+    if (overlay) overlay.classList.add('hidden');
+  }
+
+  const modalClose = $('#provider-modal-close');
+  const pfCancel = $('#pf-cancel-btn');
+  const modalOverlay = $('#provider-modal-overlay');
+
+  if (modalClose) modalClose.addEventListener('click', closeProviderModalWithReset);
+  if (pfCancel) pfCancel.addEventListener('click', closeProviderModalWithReset);
+  if (modalOverlay) {
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) closeProviderModalWithReset();
+    });
+  }
+
+  // Close on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modalOverlay && !modalOverlay.classList.contains('hidden')) {
+      closeProviderModalWithReset();
+    }
+  });
+
+  // ── API Key show/hide ─────────────────────────────────────────
+
+  const pfEyeBtn = $('#pf-apikey-toggle');
+  if (pfEyeBtn) {
+    pfEyeBtn.addEventListener('click', () => {
+      const input = $('#pf-apikey');
+      const icon = $('#pf-eye-icon');
+      if (!input) return;
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      if (icon) {
+        icon.innerHTML = showing
+          ? '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
+          : '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
+      }
+    });
+  }
+
+  // ── Model combo dropdown helpers ─────────────────────────────
+
+  // Cached models for the current modal session
+  let pfFetchedModels = [];
+
+  function renderModelCombo(models, currentValue) {
+    const arrow = $('#pf-model-arrow');
+    const dropdown = $('#pf-model-dropdown');
+    const hint = $('#pf-model-hint');
+    if (!arrow || !dropdown) return;
+
+    pfFetchedModels = models || [];
+
+    if (pfFetchedModels.length === 0) {
+      arrow.style.display = 'none';
+      dropdown.classList.add('hidden');
+      return;
+    }
+
+    // Show arrow button
+    arrow.style.display = 'grid';
+
+    // Update hint
+    if (hint) hint.textContent = `${pfFetchedModels.length} models available — select one or type your own.`;
+
+    // Build dropdown HTML
+    function buildList(filter) {
+      const filtered = filter
+        ? pfFetchedModels.filter((m) => m.toLowerCase().includes(filter.toLowerCase()))
+        : pfFetchedModels;
+      const cur = $('#pf-model')?.value?.trim();
+      if (filtered.length === 0) {
+        return `<div class="model-combo-empty">No models match "${escapeHtml(filter)}"</div>`;
+      }
+      return filtered.map((m) => {
+        const isSel = m === cur;
+        const checkSvg = isSel
+          ? `<svg class="model-combo-item-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+          : `<span style="width:12px;flex-shrink:0"></span>`;
+        return `<button class="model-combo-item${isSel ? ' selected' : ''}" data-model="${escapeAttr(m)}" type="button">${checkSvg}${escapeHtml(m)}</button>`;
+      }).join('');
+    }
+
+    dropdown.innerHTML = `
+      <div class="model-combo-search-wrap">
+        <input class="model-combo-search" id="pf-model-search" type="text" placeholder="Filter models…" autocomplete="off" />
       </div>
+      <div class="model-combo-list" id="pf-model-list">${buildList('')}</div>
+      <div class="model-combo-count" id="pf-model-count">${pfFetchedModels.length} models</div>
     `;
 
-    const testBtn = $('#provider-test-this');
-    if (testBtn) testBtn.addEventListener('click', () => {
-      switchView('diagnostics');
-      setTimeout(() => $('#test-connection')?.click(), 250);
-    });
-    const fetchBtn = $('#provider-fetch-this');
-    if (fetchBtn) fetchBtn.addEventListener('click', () => {
-      switchView('models');
-      setTimeout(() => $('#refresh-available')?.click(), 250);
-    });
-    const editBtn = $('#provider-edit');
-    if (editBtn) editBtn.addEventListener('click', () => switchView('settings'));
+    // Search filter
+    const searchInput = $('#pf-model-search');
+    const listEl = $('#pf-model-list');
+    const countEl = $('#pf-model-count');
+    if (searchInput && listEl) {
+      searchInput.addEventListener('input', () => {
+        const q = searchInput.value.trim();
+        listEl.innerHTML = buildList(q);
+        if (countEl) {
+          const n = q
+            ? pfFetchedModels.filter((m) => m.toLowerCase().includes(q.toLowerCase())).length
+            : pfFetchedModels.length;
+          countEl.textContent = `${n} of ${pfFetchedModels.length} models`;
+        }
+        bindComboItems();
+      });
+    }
+
+    bindComboItems();
   }
 
-  const providerTestAll = $('#provider-test-all');
-  if (providerTestAll) {
-    providerTestAll.addEventListener('click', () => {
-      switchView('diagnostics');
-      setTimeout(() => $('#diag-run')?.click(), 250);
+  function bindComboItems() {
+    const dropdown = $('#pf-model-dropdown');
+    if (!dropdown) return;
+    dropdown.querySelectorAll('.model-combo-item').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const val = btn.getAttribute('data-model');
+        const input = $('#pf-model');
+        if (input && val) input.value = val;
+        closeModelCombo();
+      });
     });
   }
-  const providerFetchModels = $('#provider-fetch-models');
-  if (providerFetchModels) {
-    providerFetchModels.addEventListener('click', () => {
-      switchView('models');
-      setTimeout(() => $('#refresh-available')?.click(), 250);
+
+  function openModelCombo() {
+    const dropdown = $('#pf-model-dropdown');
+    const arrow = $('#pf-model-arrow');
+    if (!dropdown || pfFetchedModels.length === 0) return;
+    // Re-render to update selected state
+    renderModelCombo(pfFetchedModels, $('#pf-model')?.value);
+    dropdown.classList.remove('hidden');
+    if (arrow) arrow.classList.add('open');
+    // Focus the search box
+    setTimeout(() => $('#pf-model-search')?.focus(), 50);
+  }
+
+  function closeModelCombo() {
+    const dropdown = $('#pf-model-dropdown');
+    const arrow = $('#pf-model-arrow');
+    if (dropdown) dropdown.classList.add('hidden');
+    if (arrow) arrow.classList.remove('open');
+  }
+
+  // Arrow button toggle
+  const pfModelArrow = $('#pf-model-arrow');
+  if (pfModelArrow) {
+    pfModelArrow.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dropdown = $('#pf-model-dropdown');
+      if (dropdown && !dropdown.classList.contains('hidden')) closeModelCombo();
+      else openModelCombo();
     });
   }
+
+  // Close combo when clicking outside modal
+  document.addEventListener('click', (e) => {
+    const combo = $('#pf-model-combo');
+    if (combo && !combo.contains(e.target)) closeModelCombo();
+  });
+
+  // Also trigger open on input focus if we have models cached
+  const pfModelInput = $('#pf-model');
+  if (pfModelInput) {
+    pfModelInput.addEventListener('focus', () => {
+      if (pfFetchedModels.length > 0) openModelCombo();
+    });
+    pfModelInput.addEventListener('input', () => {
+      // Sync filter with search box if dropdown is open
+      const dropdown = $('#pf-model-dropdown');
+      if (dropdown && !dropdown.classList.contains('hidden')) {
+        const search = $('#pf-model-search');
+        if (search) {
+          search.value = pfModelInput.value;
+          search.dispatchEvent(new Event('input'));
+        }
+      }
+    });
+  }
+
+  // Reset combo when modal closes
+  function resetModelCombo() {
+    pfFetchedModels = [];
+    const arrow = $('#pf-model-arrow');
+    const dropdown = $('#pf-model-dropdown');
+    const hint = $('#pf-model-hint');
+    if (arrow) { arrow.style.display = 'none'; arrow.classList.remove('open'); }
+    if (dropdown) { dropdown.innerHTML = ''; dropdown.classList.add('hidden'); }
+    if (hint) hint.textContent = 'Used for connection tests and as the fallback model.';
+  }
+
+  // Patch closeProviderModal to also reset combo
+  // We do this by overriding the close button and overlay click to also call resetModelCombo.
+  // (closeProviderModal is a named function so we wrap the callers instead)
+  function closeProviderModalWithReset() {
+    closeProviderModal();
+    resetModelCombo();
+  }
+
+  // ── Test Connection in modal ──────────────────────────────────
+
+  const pfTestBtn = $('#pf-test-btn');
+  if (pfTestBtn) {
+    pfTestBtn.addEventListener('click', async () => {
+      const id = $('#provider-modal-id')?.value?.trim();
+      const result = $('#pf-test-result');
+      if (!result) return;
+
+      const baseUrl = $('#pf-baseurl')?.value?.trim();
+      const apiKey  = $('#pf-apikey')?.value?.trim();
+      const modelInput = $('#pf-model');
+
+      if (!baseUrl) { toast('Enter a Base URL first.', 'warn'); return; }
+
+      pfTestBtn.disabled = true;
+      result.textContent = 'Fetching models…';
+      result.className = 'pf-test-result loading';
+
+      const effectiveKey = apiKey;
+
+      // ── Fetch /models ──────────────────────────────────────────
+      // This is the primary connectivity proof: if /models responds with a
+      // non-empty list the key and URL are valid.  No need to also hit
+      // /chat/completions (which requires knowing a valid model name).
+      let fetchedModels = [];
+      let modelsOk = false;
+      let modelsError = '';
+      let latencyMs = 0;
+
+      if (id && !apiKey) {
+        // Editing provider with unchanged key — use backend endpoint
+        try {
+          const start = Date.now();
+          const modelsData = await api('POST', `/providers/${id}/sync-models`);
+          latencyMs = Date.now() - start;
+          fetchedModels = modelsData.models || [];
+          modelsOk = true;
+        } catch (err) {
+          modelsError = err.message || 'Failed to fetch models';
+        }
+      } else {
+        // New provider or key updated — fetch /models directly
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 15000);
+          const start = Date.now();
+          const r = await fetch(`${baseUrl}/models`, {
+            method: 'GET',
+            headers: {
+              Accept: 'application/json',
+              ...(effectiveKey ? { Authorization: `Bearer ${effectiveKey}` } : {}),
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timer);
+          latencyMs = Date.now() - start;
+
+          if (r.ok) {
+            const data = await r.json().catch(() => ({}));
+            // Handle both { data: [...] } and bare array responses
+            const arr = Array.isArray(data?.data)
+              ? data.data
+              : Array.isArray(data)
+                ? data
+                : [];
+            fetchedModels = arr
+              .map((m) => (typeof m === 'string' ? m : m?.id))
+              .filter((x) => typeof x === 'string' && x.length > 0);
+            modelsOk = true;
+          } else {
+            const body = await r.json().catch(() => ({}));
+            const msg = body?.error?.message || body?.error || `HTTP ${r.status}`;
+            modelsError = `${r.status}: ${typeof msg === 'string' ? msg.slice(0, 150) : JSON.stringify(msg).slice(0, 150)}`;
+          }
+        } catch (err) {
+          modelsError = err.name === 'AbortError' ? 'Timeout after 15s' : err.message;
+        }
+      }
+
+      // ── Update UI ──────────────────────────────────────────────
+      if (!modelsOk) {
+        result.textContent = `✗ ${modelsError}`;
+        result.className = 'pf-test-result err';
+        pfTestBtn.disabled = false;
+        return;
+      }
+
+      if (fetchedModels.length > 0) {
+        result.textContent = `✓ ${latencyMs}ms · ${fetchedModels.length} models`;
+        result.className = 'pf-test-result ok';
+
+        // Pre-fill model field with first model if still empty
+        if (modelInput && !modelInput.value.trim()) {
+          modelInput.value = fetchedModels[0];
+        }
+
+        renderModelCombo(fetchedModels, modelInput?.value);
+        setTimeout(() => openModelCombo(), 120);
+      } else {
+        // /models succeeded but returned an empty list — still counts as connected
+        result.textContent = `✓ Connected · ${latencyMs}ms (no models listed)`;
+        result.className = 'pf-test-result ok';
+      }
+
+      pfTestBtn.disabled = false;
+    });
+  }
+
+  // ── Save Provider (Add/Edit) ──────────────────────────────────
+
+  const pfSaveBtn = $('#pf-save-btn');
+  if (pfSaveBtn) {
+    pfSaveBtn.addEventListener('click', async () => {
+      const id = $('#provider-modal-id')?.value?.trim();
+      const body = {
+        name: $('#pf-name')?.value?.trim(),
+        baseUrl: $('#pf-baseurl')?.value?.trim(),
+        apiKey: $('#pf-apikey')?.value?.trim(),
+        defaultModel: $('#pf-model')?.value?.trim(),
+        notes: $('#pf-notes')?.value?.trim() || '',
+      };
+
+      pfSaveBtn.disabled = true;
+      pfSaveBtn.textContent = 'Saving…';
+
+      try {
+        let snap;
+        if (id) {
+          snap = await api('PUT', `/providers/${id}`, body);
+          const idx = providerState.providers.findIndex((p) => p.id === id);
+          if (idx >= 0) providerState.providers[idx] = snap;
+          toast(`Provider "${snap.name}" updated.`, 'ok');
+        } else {
+          snap = await api('POST', '/providers', body);
+          providerState.providers.push(snap);
+          toast(`Provider "${snap.name}" added.`, 'ok');
+        }
+        closeProviderModalWithReset();
+        renderActiveBanner();
+        renderProviderCards();
+      } catch (err) {
+        toast(err.message || 'Save failed.', 'error');
+      } finally {
+        pfSaveBtn.disabled = false;
+        pfSaveBtn.textContent = 'Save Provider';
+      }
+    });
+  }
+
+  // ── Spin animation for test button (reuse) ────────────────────
+  const spinStyle = document.createElement('style');
+  spinStyle.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+  document.head.appendChild(spinStyle);
+
+  /* ── Topbar Provider Switcher ──────────────────────────────── */
+  (function initProviderSwitcher() {
+    const switcher = $('#provider-switcher');
+    const switcherBtn = $('#provider-switcher-btn');
+    const switcherName = $('#provider-switcher-name');
+    const switcherMenu = $('#provider-switcher-menu');
+    if (!switcher || !switcherBtn || !switcherMenu) return;
+
+    function renderSwitcherMenu() {
+      if (providerState.providers.length === 0) {
+        switcher.style.display = 'none';
+        return;
+      }
+      switcher.style.display = 'flex';
+
+      // Update button label
+      const active = providerState.providers.find((p) => p.id === providerState.activeId);
+      if (active) {
+        switcherName.textContent = active.name;
+      } else {
+        switcherName.textContent = '.env defaults';
+      }
+
+      // Render menu items
+      const checkSvg = `<svg class="provider-switcher-item-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+      const emptySvg = `<span style="width:14px;flex-shrink:0"></span>`;
+
+      let html = '<div class="provider-switcher-header">Switch Provider</div>';
+      providerState.providers.forEach((p) => {
+        const isActive = p.id === providerState.activeId;
+        html += `<button class="provider-switcher-item${isActive ? ' active-item' : ''}" data-switch-id="${escapeAttr(p.id)}" type="button">
+          ${isActive ? checkSvg : emptySvg}
+          <div style="min-width:0;flex:1">
+            <div class="provider-switcher-item-name">${escapeHtml(p.name)}</div>
+            <div class="provider-switcher-item-model">${escapeHtml(p.defaultModel)}</div>
+          </div>
+        </button>`;
+      });
+      html += '<div class="provider-switcher-divider"></div>';
+      if (providerState.activeId) {
+        html += `<div class="provider-switcher-footer"><button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center" id="switcher-use-env">Use .env defaults</button></div>`;
+      }
+      html += `<div class="provider-switcher-footer" style="padding-top:0"><button class="btn btn-outline btn-sm" style="width:100%;justify-content:center" id="switcher-manage">Manage Providers</button></div>`;
+      switcherMenu.innerHTML = html;
+
+      // Bind clicks
+      switcherMenu.querySelectorAll('[data-switch-id]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          closeSwitcherMenu();
+          const id = btn.getAttribute('data-switch-id');
+          if (id === providerState.activeId) return;
+          try {
+            const data = await api('POST', `/providers/${id}/activate`);
+            providerState.activeId = data.activeId;
+            renderSwitcherMenu();
+            renderActiveBanner();
+            renderProviderCards();
+            loadConfig();
+            if (data.restored) {
+              if (typeof loadMappings === 'function') await loadMappings();
+              const p = providerState.providers.find((x) => x.id === id);
+              toast(`Switched to ${p?.name || 'provider'}. Your saved mappings have been restored.`, 'ok', 'Provider Restored');
+            } else {
+              const p = providerState.providers.find((x) => x.id === id);
+              toast(`Switched to ${p?.name || 'provider'}. Syncing mappings…`, 'ok', 'Provider Switched');
+              setTimeout(async () => {
+                if (typeof loadMappings === 'function') {
+                  await loadMappings();
+                  toast('Model Router updated to new provider.', 'ok', 'Mappings Updated');
+                }
+              }, 2500);
+            }
+          } catch (err) {
+            toast(err.message || 'Failed to switch.', 'error');
+          }
+        });
+      });
+
+      const useEnvBtn = $('#switcher-use-env');
+      if (useEnvBtn) {
+        useEnvBtn.addEventListener('click', async () => {
+          closeSwitcherMenu();
+          try {
+            await api('POST', '/providers/deactivate');
+            providerState.activeId = null;
+            renderSwitcherMenu();
+            renderActiveBanner();
+            renderProviderCards();
+            toast('Reverted to .env defaults.', 'info');
+            loadConfig();
+          } catch (err) {
+            toast(err.message || 'Failed.', 'error');
+          }
+        });
+      }
+
+      const manageBtn = $('#switcher-manage');
+      if (manageBtn) {
+        manageBtn.addEventListener('click', () => {
+          closeSwitcherMenu();
+          switchView('providers');
+        });
+      }
+    }
+
+    function openSwitcherMenu() {
+      renderSwitcherMenu();
+      switcherMenu.classList.remove('hidden');
+      switcherBtn.setAttribute('aria-expanded', 'true');
+    }
+    function closeSwitcherMenu() {
+      switcherMenu.classList.add('hidden');
+      switcherBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    switcherBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (switcherMenu.classList.contains('hidden')) openSwitcherMenu();
+      else closeSwitcherMenu();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!switcher.contains(e.target)) closeSwitcherMenu();
+    });
+
+    // Expose refresh function so loadProviders can update it
+    window.__refreshProviderSwitcher = renderSwitcherMenu;
+  })();
 
   /* ══════════════════════════════════════════════════════════════════
      SECTION 23 — Diagnostics
@@ -4236,6 +5215,9 @@
     initCharts();
     await loadHistoricalRequests();
 
+    // Load providers on startup so topbar switcher is always populated
+    loadProviders();
+
     if (initialView === 'overview') {
       await loadStats();
       renderSetupChecklist();
@@ -4256,7 +5238,8 @@
     if (initialView === 'providers') renderProviders();
     if (initialView === 'diagnostics') resetDiagnostics();
     if (initialView === 'models') loadMappings();
-    if (initialView === 'settings') { loadConfig(); loadOperations(); }
+    if (initialView === 'settings') { loadConfig(); loadOperations(); lciLoadStatus(); }
+
 
     const ivEl = $(`.view[data-view="${initialView}"]`);
     staggerView(ivEl);
@@ -4267,3 +5250,481 @@
 
   init();
 })();
+
+  /* ══════════════════════════════════════════════════════════════════
+     SECTION 25 — Auto-Compact Context System
+     ══════════════════════════════════════════════════════════════════ */
+  (function initContextModule() {
+
+    /* ── Helpers ─────────────────────────────────────────────────── */
+    function fmtTokens(n) {
+      if (!n) return '0';
+      if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+      if (n >= 1_000) return Math.round(n / 1_000) + 'K';
+      return String(n);
+    }
+    function fmtTime(iso) {
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleTimeString(); } catch { return '—'; }
+    }
+    function fmtRelative(iso) {
+      if (!iso) return '—';
+      try {
+        const diff = Date.now() - new Date(iso).getTime();
+        if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`;
+        if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+        return `${Math.floor(diff / 3_600_000)}h ago`;
+      } catch { return '—'; }
+    }
+
+    function pctClass(pct) {
+      if (pct >= 90) return 'danger';
+      if (pct >= 70) return 'warn';
+      return 'ok';
+    }
+
+    /* ── API calls ───────────────────────────────────────────────── */
+    async function apiGetContext() {
+      const r = await fetch('/admin/api/context');
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }
+    async function apiGetHistory() {
+      const r = await fetch('/admin/api/context/history');
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }
+    async function apiGetSettings() {
+      const r = await fetch('/admin/api/context/settings');
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }
+    async function apiSaveSettings(patch) {
+      const r = await fetch('/admin/api/context/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e?.error?.message || `HTTP ${r.status}`); }
+      return r.json();
+    }
+    async function apiCompact(sessionId) {
+      const body = sessionId ? { sessionId } : {};
+      const r = await fetch('/admin/api/context/compact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e?.error?.message || `HTTP ${r.status}`); }
+      return r.json();
+    }
+    async function apiClearAll() {
+      const r = await fetch('/admin/api/context/sessions', { method: 'DELETE' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }
+    async function apiClearSession(id) {
+      const r = await fetch(`/admin/api/context/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }
+
+    /* ── Overview Panel (on the Overview page) ───────────────────── */
+    function updateOverviewPanel(data) {
+      const panel = document.getElementById('ctx-overview-panel');
+      if (!panel) return;
+
+      const pct = data.usagePercent || 0;
+      const cls = pctClass(pct);
+
+      // Panel state class
+      panel.className = `ctx-panel ctx-state-${cls === 'ok' ? 'ok' : cls === 'warn' ? 'warn' : 'danger'}`;
+
+      // Progress bar
+      const fill = document.getElementById('ctx-usage-fill');
+      const pctText = document.getElementById('ctx-usage-pct-text');
+      if (fill) {
+        fill.style.width = `${Math.min(100, pct)}%`;
+        fill.className = `ctx-usage-fill${cls === 'warn' ? ' ctx-warn' : cls === 'danger' ? ' ctx-danger' : ''}`;
+      }
+      if (pctText) {
+        pctText.textContent = `${pct}%`;
+        pctText.className = `ctx-usage-value ${cls}`;
+      }
+
+      // Token detail
+      const detail = document.getElementById('ctx-tokens-detail');
+      if (detail) detail.textContent = `${fmtTokens(data.usedTokens)} / ${fmtTokens(data.maxTokens)} tokens`;
+
+      // Threshold
+      const thr = document.getElementById('ctx-threshold-pct');
+      if (thr) thr.textContent = data.threshold || 80;
+
+      // Stats
+      const statC = document.getElementById('ctx-stat-compactions');
+      const statS = document.getElementById('ctx-stat-saved');
+      const statSess = document.getElementById('ctx-stat-sessions');
+      if (statC) statC.textContent = fmtTokens(data.compactions || 0);
+      if (statS) statS.textContent = fmtTokens(data.tokensSaved || 0);
+      if (statSess) statSess.textContent = data.activeSessions || 0;
+
+      // Status badge
+      const badge = document.getElementById('ctx-overview-status-badge');
+      if (badge) {
+        if (pct >= 90) {
+          badge.textContent = 'High Usage';
+          badge.className = 'badge badge-error';
+        } else if (pct >= 70) {
+          badge.textContent = 'Near Limit';
+          badge.className = 'badge badge-warning';
+        } else if (data.enabled) {
+          badge.textContent = 'Auto ON';
+          badge.className = 'badge badge-success';
+        } else {
+          badge.textContent = 'Auto OFF';
+          badge.className = 'badge badge-muted';
+        }
+      }
+
+      // Nav badge for warning
+      const navBadge = document.getElementById('ctx-nav-badge');
+      if (navBadge) {
+        if (data.sessionsNearLimit > 0) {
+          navBadge.textContent = data.sessionsNearLimit;
+          navBadge.classList.remove('hidden');
+        } else {
+          navBadge.classList.add('hidden');
+        }
+      }
+
+      // Toggle state
+      const track = document.getElementById('ctx-toggle-track');
+      if (track) {
+        if (data.enabled) {
+          track.classList.add('on');
+          track.setAttribute('aria-checked', 'true');
+        } else {
+          track.classList.remove('on');
+          track.setAttribute('aria-checked', 'false');
+        }
+      }
+    }
+
+    /* ── Main Context Page ───────────────────────────────────────── */
+    function updateMainPanel(data) {
+      const pct = data.usagePercent || 0;
+      const cls = pctClass(pct);
+
+      const panel = document.getElementById('ctx-main-panel');
+      if (panel) panel.className = `ctx-panel ctx-state-${cls === 'ok' ? 'ok' : cls === 'warn' ? 'warn' : 'danger'}`;
+
+      const fill = document.getElementById('ctx-main-fill');
+      const pctText = document.getElementById('ctx-main-pct-text');
+      if (fill) {
+        fill.style.width = `${Math.min(100, pct)}%`;
+        fill.className = `ctx-usage-fill${cls === 'warn' ? ' ctx-warn' : cls === 'danger' ? ' ctx-danger' : ''}`;
+      }
+      if (pctText) {
+        pctText.textContent = `${pct}%`;
+        pctText.className = `ctx-usage-value ${cls}`;
+      }
+
+      const detail = document.getElementById('ctx-main-tokens-detail');
+      if (detail) detail.textContent = `${fmtTokens(data.usedTokens)} / ${fmtTokens(data.maxTokens)} tokens`;
+
+      const thr = document.getElementById('ctx-main-threshold');
+      const keep = document.getElementById('ctx-main-keep');
+      if (thr) thr.textContent = data.threshold || 80;
+      if (keep) keep.textContent = data.keepRecentMessages || 20;
+
+      const elC = document.getElementById('ctx-main-compactions');
+      const elS = document.getElementById('ctx-main-saved');
+      const elSess = document.getElementById('ctx-main-sessions');
+      const elNear = document.getElementById('ctx-main-near');
+      const elLast = document.getElementById('ctx-main-last');
+      if (elC) elC.textContent = fmtTokens(data.compactions || 0);
+      if (elS) elS.textContent = fmtTokens(data.tokensSaved || 0);
+      if (elSess) elSess.textContent = data.activeSessions || 0;
+      if (elNear) elNear.textContent = data.sessionsNearLimit || 0;
+      if (elLast) elLast.textContent = fmtRelative(data.lastCompactionAt);
+
+      // Toggle
+      const mainTrack = document.getElementById('ctx-main-toggle-track');
+      const mainLabel = document.getElementById('ctx-main-enabled-label');
+      if (mainTrack) {
+        if (data.enabled) {
+          mainTrack.classList.add('on');
+          mainTrack.setAttribute('aria-checked', 'true');
+        } else {
+          mainTrack.classList.remove('on');
+          mainTrack.setAttribute('aria-checked', 'false');
+        }
+      }
+      if (mainLabel) mainLabel.textContent = data.enabled ? 'ON' : 'OFF';
+    }
+
+    function renderSessionsTable(sessions) {
+      const tbody = document.getElementById('ctx-sessions-tbody');
+      if (!tbody) return;
+      if (!sessions || sessions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No active sessions</td></tr>';
+        return;
+      }
+      tbody.innerHTML = sessions.map(s => {
+        const pct = s.usagePercent || 0;
+        const cls = pctClass(pct);
+        const shortId = s.sessionId.slice(0, 24);
+        return `<tr>
+          <td><code title="${escapeHtml(s.sessionId)}" style="font-size:11px;">${escapeHtml(shortId)}…</code></td>
+          <td><code style="font-size:11px;">${escapeHtml(s.model)}</code></td>
+          <td>
+            <div class="ctx-session-bar">
+              <div class="ctx-session-bar-track">
+                <div class="ctx-session-bar-fill ${cls}" style="width:${Math.min(100,pct)}%"></div>
+              </div>
+              <span class="ctx-session-pct ${cls}">${pct}%</span>
+            </div>
+          </td>
+          <td class="num">${s.messageCount || 0}</td>
+          <td class="num">${s.compactionCount || 0}</td>
+          <td>
+            <div class="row-actions">
+              <button class="icon-btn" title="Clear session" data-session-clear="${escapeAttr(s.sessionId)}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+              </button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+      // Wire clear buttons
+      tbody.querySelectorAll('[data-session-clear]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.sessionClear;
+          try {
+            await apiClearSession(id);
+            showToastGlobal('Session cleared', 'success');
+            loadContextPage();
+          } catch (err) {
+            showToastGlobal('Clear failed: ' + err.message, 'error');
+          }
+        });
+      });
+    }
+
+    function renderHistoryTable(history) {
+      const tbody = document.getElementById('ctx-history-tbody');
+      const totalEl = document.getElementById('ctx-hist-total');
+      const savedEl = document.getElementById('ctx-hist-saved-total');
+      if (totalEl) totalEl.textContent = fmtTokens(history.totalCompactions || 0);
+      if (savedEl) savedEl.textContent = fmtTokens(history.totalTokensSaved || 0);
+      if (!tbody) return;
+      const entries = [...(history.entries || [])].reverse().slice(0, 50);
+      if (!entries.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-row">No compaction history</td></tr>';
+        return;
+      }
+      tbody.innerHTML = entries.map(e => {
+        const lvlClass = `l${e.level}`;
+        const lvlLabel = `Level ${e.level}`;
+        return `<tr>
+          <td style="font-size:11.5px;">${fmtTime(e.compactedAt)}</td>
+          <td><span class="ctx-history-level ${lvlClass}">${lvlLabel}</span></td>
+          <td class="num" style="font-size:11.5px;">${fmtTokens(e.tokensSaved)}</td>
+          <td class="num" style="font-size:11px;color:var(--text-muted);">${fmtTokens(e.tokensBeforeCompaction)} → ${fmtTokens(e.tokensAfterCompaction)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function populateSettingsForm(settings) {
+      const thr = document.getElementById('ctx-setting-threshold');
+      const warn = document.getElementById('ctx-setting-warn');
+      const keep = document.getElementById('ctx-setting-keep');
+      const ctxsize = document.getElementById('ctx-setting-ctxsize');
+      const summary = document.getElementById('ctx-setting-summary');
+      if (thr) thr.value = Math.round((settings.compactThreshold || 0.8) * 100);
+      if (warn) warn.value = Math.round((settings.warnThreshold || 0.7) * 100);
+      if (keep) keep.value = settings.keepRecentMessages || 20;
+      if (ctxsize) ctxsize.value = settings.defaultContextSize || 200000;
+      if (summary) summary.checked = settings.generateSummary !== false;
+    }
+
+    /* ── Load functions ──────────────────────────────────────────── */
+    async function loadContextOverview() {
+      try {
+        const data = await apiGetContext();
+        updateOverviewPanel(data);
+      } catch { /* silent — overview is non-critical */ }
+    }
+
+    async function loadContextPage() {
+      try {
+        const [data, history, settings] = await Promise.all([
+          apiGetContext(),
+          apiGetHistory(),
+          apiGetSettings(),
+        ]);
+        updateMainPanel(data);
+        updateOverviewPanel(data);
+        renderSessionsTable(data.topSessions || []);
+        renderHistoryTable(history);
+        populateSettingsForm(settings);
+      } catch (err) {
+        console.warn('[ctx] load error:', err);
+      }
+    }
+
+    /* ── Toggle auto-compact (overview panel) ───────────────────── */
+    async function toggleAutoCompact(track, currentEnabled) {
+      const newVal = !currentEnabled;
+      try {
+        await apiSaveSettings({ enabled: newVal });
+        if (newVal) {
+          track.classList.add('on'); track.setAttribute('aria-checked', 'true');
+        } else {
+          track.classList.remove('on'); track.setAttribute('aria-checked', 'false');
+        }
+        showToastGlobal(`Auto-Compact ${newVal ? 'enabled' : 'disabled'}`, 'success');
+        loadContextOverview();
+      } catch (err) {
+        showToastGlobal('Failed: ' + err.message, 'error');
+      }
+    }
+
+    /* ── Wire up overview toggle ─────────────────────────────────── */
+    const ovToggle = document.getElementById('ctx-toggle-track');
+    if (ovToggle) {
+      ovToggle.addEventListener('click', () => {
+        const enabled = ovToggle.getAttribute('aria-checked') === 'true';
+        toggleAutoCompact(ovToggle, enabled);
+      });
+      ovToggle.addEventListener('keydown', e => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          const enabled = ovToggle.getAttribute('aria-checked') === 'true';
+          toggleAutoCompact(ovToggle, enabled);
+        }
+      });
+    }
+
+    /* ── Wire up main page toggle ────────────────────────────────── */
+    const mainToggle = document.getElementById('ctx-main-toggle-track');
+    if (mainToggle) {
+      mainToggle.addEventListener('click', () => {
+        const enabled = mainToggle.getAttribute('aria-checked') === 'true';
+        toggleAutoCompact(mainToggle, enabled);
+      });
+    }
+
+    /* ── Compact Now buttons ─────────────────────────────────────── */
+    async function doCompact(btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<svg class="ctx-compacting" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Compacting…';
+      btn.disabled = true;
+      try {
+        const result = await apiCompact();
+        if (result.compacted) {
+          showToastGlobal(`Compacted! Saved ${fmtTokens(result.previousStats?.usedTokens || 0)} tokens`, 'success');
+        } else {
+          showToastGlobal(result.message || 'No compaction needed', 'info');
+        }
+        loadContextOverview();
+        if (document.querySelector('.view[data-view="context"]:not([hidden])')) {
+          loadContextPage();
+        }
+      } catch (err) {
+        showToastGlobal('Compact failed: ' + err.message, 'error');
+      } finally {
+        btn.innerHTML = orig;
+        btn.disabled = false;
+      }
+    }
+
+    const ovCompactBtn = document.getElementById('ctx-compact-now-btn');
+    if (ovCompactBtn) ovCompactBtn.addEventListener('click', () => doCompact(ovCompactBtn));
+
+    const mainCompactBtn = document.getElementById('ctx-main-compact-btn');
+    if (mainCompactBtn) mainCompactBtn.addEventListener('click', () => doCompact(mainCompactBtn));
+
+    /* ── Clear All ───────────────────────────────────────────────── */
+    const clearAllBtn = document.getElementById('ctx-clear-all-btn');
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener('click', async () => {
+        if (!confirm('Clear all context sessions? This removes all tracked session data.')) return;
+        try {
+          await apiClearAll();
+          showToastGlobal('All sessions cleared', 'success');
+          loadContextPage();
+        } catch (err) {
+          showToastGlobal('Clear failed: ' + err.message, 'error');
+        }
+      });
+    }
+
+    /* ── Refresh button ──────────────────────────────────────────── */
+    const refreshBtn = document.getElementById('ctx-refresh-btn');
+    if (refreshBtn) refreshBtn.addEventListener('click', loadContextPage);
+
+    const sessionsRefresh = document.getElementById('ctx-sessions-refresh');
+    if (sessionsRefresh) sessionsRefresh.addEventListener('click', loadContextPage);
+
+    /* ── Save Settings ───────────────────────────────────────────── */
+    const saveSettingsBtn = document.getElementById('ctx-save-settings-btn');
+    if (saveSettingsBtn) {
+      saveSettingsBtn.addEventListener('click', async () => {
+        const thr = parseFloat(document.getElementById('ctx-setting-threshold')?.value || '80') / 100;
+        const warn = parseFloat(document.getElementById('ctx-setting-warn')?.value || '70') / 100;
+        const keep = parseInt(document.getElementById('ctx-setting-keep')?.value || '20', 10);
+        const ctxsize = parseInt(document.getElementById('ctx-setting-ctxsize')?.value || '200000', 10);
+        const summary = document.getElementById('ctx-setting-summary')?.checked !== false;
+
+        try {
+          await apiSaveSettings({
+            compactThreshold: thr,
+            warnThreshold: warn,
+            keepRecentMessages: keep,
+            defaultContextSize: ctxsize,
+            generateSummary: summary,
+          });
+          showToastGlobal('Settings saved', 'success');
+          loadContextPage();
+        } catch (err) {
+          showToastGlobal('Save failed: ' + err.message, 'error');
+        }
+      });
+    }
+
+    /* ── View switch hook ────────────────────────────────────────── */
+    // Hook into the existing view navigation to load context data
+    document.querySelectorAll('[data-view="context"]').forEach(el => {
+      el.addEventListener('click', () => {
+        setTimeout(loadContextPage, 50);
+      });
+    });
+
+    /* ── Helper: show toast without reference to outer scope ──────── */
+    function showToastGlobal(msg, type = 'info') {
+      // Use the outer scope's showToast if available, else console
+      if (typeof showToast === 'function') {
+        showToast(msg, type);
+      } else {
+        console.info(`[ctx toast] ${type}: ${msg}`);
+      }
+    }
+
+    /* ── Auto-load on page load ──────────────────────────────────── */
+    loadContextOverview();
+
+    // Expose for switchView
+    window.__loadContextPage = loadContextPage;
+
+    // Refresh overview panel every 15s alongside stats
+    setInterval(loadContextOverview, 15_000);
+
+    // Load context page if it is the initial view
+    const hash = location.hash.replace('#', '') || 'overview';
+    if (hash === 'context') {
+      setTimeout(loadContextPage, 100);
+    }
+
+  })();

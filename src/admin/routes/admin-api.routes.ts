@@ -2,8 +2,14 @@ import { Router, type Request, type Response } from 'express';
 import type { AdminState } from '../admin-state';
 import { ConfigValidationError } from '../config-manager';
 import { ModelRegistryValidationError } from '../model-registry';
+import { ProviderValidationError } from '../provider-manager';
 import { getLogger } from '../../utils/logger';
 import { execFileSync } from 'node:child_process';
+import { buildContextRouter } from './context.routes';
+import * as os from 'node:os';
+import * as fs from 'node:fs';
+import * as nodePath from 'node:path';
+import { getConfig } from '../../config/env';
 
 function detectProcessManager(): { manager: string; appName: string } {
   const pm2Name = process.env.PM2_APP_NAME;
@@ -391,9 +397,377 @@ export function buildAdminApiRouter(state: AdminState): Router {
     scheduleGatewayRestart(proc, logger);
   });
 
+  // ── Provider Management ───────────────────────────────────────────────────
+
+  // GET /admin/api/providers — list all providers (keys redacted)
+  router.get('/providers', (_req: Request, res: Response) => {
+    res.json(state.providerManager.snapshot());
+  });
+
+  // POST /admin/api/providers — add a new provider
+  router.post('/providers', (req: Request, res: Response) => {
+    try {
+      const snap = state.providerManager.add(req.body);
+      res.status(201).json(snap);
+    } catch (err) {
+      if (err instanceof ProviderValidationError) {
+        res.status(400).json({ type: 'error', error: { type: 'invalid_request_error', message: err.message } });
+        return;
+      }
+      logger.error({ err }, 'provider_add_failed');
+      res.status(500).json({ type: 'error', error: { type: 'api_error', message: 'Failed to add provider.' } });
+    }
+  });
+
+  // PUT /admin/api/providers/:id — update a provider
+  router.put('/providers/:id', (req: Request, res: Response) => {
+    try {
+      const snap = state.providerManager.update(req.params.id, req.body);
+      res.json(snap);
+    } catch (err) {
+      if (err instanceof ProviderValidationError) {
+        res.status(400).json({ type: 'error', error: { type: 'invalid_request_error', message: err.message } });
+        return;
+      }
+      logger.error({ err }, 'provider_update_failed');
+      res.status(500).json({ type: 'error', error: { type: 'api_error', message: 'Failed to update provider.' } });
+    }
+  });
+
+  // DELETE /admin/api/providers/:id — delete a provider
+  router.delete('/providers/:id', (req: Request, res: Response) => {
+    try {
+      state.providerManager.delete(req.params.id);
+      res.json({ ok: true });
+    } catch (err) {
+      if (err instanceof ProviderValidationError) {
+        res.status(400).json({ type: 'error', error: { type: 'invalid_request_error', message: err.message } });
+        return;
+      }
+      logger.error({ err }, 'provider_delete_failed');
+      res.status(500).json({ type: 'error', error: { type: 'api_error', message: 'Failed to delete provider.' } });
+    }
+  });
+
+  // POST /admin/api/providers/:id/activate — switch active provider
+  router.post('/providers/:id/activate', async (req: Request, res: Response) => {
+    try {
+      // ── Step 1: save outgoing provider's current Model Router state ──
+      const outgoingId = state.providerManager.snapshot().activeId;
+      if (outgoingId) {
+        const currentSnap = state.modelRegistry.snapshot();
+        state.providerManager.saveModelSnapshot(
+          outgoingId,
+          currentSnap.mappings,
+          currentSnap.familyRules,
+          currentSnap.default,
+        );
+        logger.info({ providerId: outgoingId }, 'provider_model_snapshot_saved');
+      }
+
+      // ── Step 2: activate the new provider ───────────────────────────
+      const payload = state.providerManager.setActive(req.params.id);
+      const active = state.providerManager.getActive();
+
+      if (active) {
+        // ── Step 3: check if this provider has a saved snapshot ─────────
+        const savedSnap = state.providerManager.getModelSnapshot(active.id);
+
+        if (savedSnap) {
+          // Restore the previously saved mappings + family rules + default
+          logger.info(
+            { providerId: active.id, savedAt: savedSnap.savedAt },
+            'provider_model_snapshot_restored',
+          );
+          if (Object.keys(savedSnap.mappings).length > 0) {
+            state.modelRegistry.replace({
+              mappings: savedSnap.mappings,
+              default: savedSnap.defaultModel,
+            });
+          } else {
+            state.modelRegistry.setDefault(savedSnap.defaultModel);
+          }
+          if (savedSnap.familyRules.length > 0) {
+            state.modelRegistry.replaceFamilyRules(savedSnap.familyRules);
+          }
+          state.configManager.update({ defaultModel: savedSnap.defaultModel });
+
+          res.json({ ...payload, restored: true, restoredFrom: savedSnap.savedAt });
+          return;
+        }
+
+        // ── Step 4: no saved snapshot — fetch models and auto-map ───────
+        if (active.defaultModel) {
+          state.configManager.update({ defaultModel: active.defaultModel });
+          state.modelRegistry.setDefault(active.defaultModel);
+        }
+
+        const fetchAndRemap = async () => {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 15_000);
+            const r = await fetch(`${active.baseUrl}/models`, {
+              method: 'GET',
+              headers: {
+                Accept: 'application/json',
+                Authorization: `Bearer ${active.apiKey}`,
+              },
+              signal: controller.signal,
+            });
+            clearTimeout(timer);
+            if (!r.ok) return;
+
+            const data = await r.json() as { data?: Array<{ id?: string }> };
+            const modelIds: string[] = Array.isArray(data?.data)
+              ? data.data.map((m) => m.id).filter((id): id is string => typeof id === 'string')
+              : [];
+            if (modelIds.length === 0) return;
+
+            state.modelRegistry.setCachedModels(modelIds);
+
+            const target = modelIds.includes(active.defaultModel)
+              ? active.defaultModel
+              : modelIds[0];
+
+            const snap = state.modelRegistry.snapshot();
+            const newMappings: Record<string, string> = {};
+            for (const claudeModel of Object.keys(snap.mappings)) {
+              newMappings[claudeModel] = target;
+            }
+            if (Object.keys(newMappings).length > 0) {
+              state.modelRegistry.replace({ mappings: newMappings, default: target });
+            } else {
+              state.modelRegistry.setDefault(target);
+            }
+
+            const updatedRules = snap.familyRules.map((rule) => ({
+              name: rule.name,
+              pattern: rule.pattern,
+              primary: target,
+              backup: modelIds.length > 1 && modelIds[1] !== target ? modelIds[1] : undefined,
+            }));
+            if (updatedRules.length > 0) {
+              state.modelRegistry.replaceFamilyRules(updatedRules);
+            }
+
+            state.configManager.update({ defaultModel: target });
+
+            logger.info(
+              { providerId: active.id, target, modelCount: modelIds.length },
+              'provider_activated_mappings_updated',
+            );
+          } catch (err) {
+            logger.warn({ err, providerId: active.id }, 'provider_activate_remap_failed');
+          }
+        };
+
+        fetchAndRemap();
+      }
+
+      res.json({ ...payload, restored: false });
+    } catch (err) {
+      if (err instanceof ProviderValidationError) {
+        res.status(400).json({ type: 'error', error: { type: 'invalid_request_error', message: err.message } });
+        return;
+      }
+      logger.error({ err }, 'provider_activate_failed');
+      res.status(500).json({ type: 'error', error: { type: 'api_error', message: 'Failed to activate provider.' } });
+    }
+  });
+
+  // POST /admin/api/providers/:id/save-snapshot — explicitly save current Model Router state for a provider
+  router.post('/providers/:id/save-snapshot', (_req: Request, res: Response) => {
+    try {
+      const id = _req.params.id;
+      if (!state.providerManager.getById(id)) {
+        res.status(404).json({ type: 'error', error: { type: 'not_found_error', message: 'Provider not found.' } });
+        return;
+      }
+      const currentSnap = state.modelRegistry.snapshot();
+      state.providerManager.saveModelSnapshot(
+        id,
+        currentSnap.mappings,
+        currentSnap.familyRules,
+        currentSnap.default,
+      );
+      res.json({ ok: true, savedAt: new Date().toISOString() });
+    } catch (err) {
+      logger.error({ err }, 'provider_save_snapshot_failed');
+      res.status(500).json({ type: 'error', error: { type: 'api_error', message: 'Failed to save snapshot.' } });
+    }
+  });
+
+  // POST /admin/api/providers/deactivate — clear active provider (use env defaults)
+  router.post('/providers/deactivate', (_req: Request, res: Response) => {
+    try {
+      const payload = state.providerManager.setActive(null);
+      res.json(payload);
+    } catch (err) {
+      logger.error({ err }, 'provider_deactivate_failed');
+      res.status(500).json({ type: 'error', error: { type: 'api_error', message: 'Failed to deactivate provider.' } });
+    }
+  });
+
+  // POST /admin/api/providers/:id/test — test a specific provider connection
+  router.post('/providers/:id/test', async (req: Request, res: Response) => {
+    const provider = state.providerManager.getById(req.params.id);
+    if (!provider) {
+      res.status(404).json({ type: 'error', error: { type: 'not_found_error', message: 'Provider not found.' } });
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
+    const start = Date.now();
+    try {
+      const testModel = provider.defaultModel || 'gpt-4o-mini';
+      const r = await fetch(`${provider.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${provider.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: testModel,
+          messages: [{ role: 'user', content: 'Hello' }],
+          max_tokens: 16,
+        }),
+        signal: controller.signal,
+      });
+      const latencyMs = Date.now() - start;
+      const text = await r.text();
+      let parsed: unknown = text;
+      try { parsed = text ? JSON.parse(text) : null; } catch { /* keep text */ }
+      if (r.ok) {
+        const body = parsed as { choices?: Array<{ message?: { content?: string } }> } | null;
+        const preview = (body?.choices?.[0]?.message?.content ?? '').slice(0, 200);
+        res.json({ success: true, latencyMs, upstreamStatus: r.status, preview });
+      } else {
+        const errBody = parsed as { error?: { message?: string } } | null;
+        const message = errBody?.error?.message ?? `HTTP ${r.status}`;
+        res.json({ success: false, latencyMs, upstreamStatus: r.status, error: message });
+      }
+    } catch (err) {
+      const latencyMs = Date.now() - start;
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      res.json({
+        success: false,
+        latencyMs,
+        upstreamStatus: null,
+        error: isAbort ? 'Request timed out after 30s' : (err instanceof Error ? err.message : String(err)),
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+
+  // POST /admin/api/providers/:id/sync-models — sync models for a specific provider
+  router.post('/providers/:id/sync-models', async (req: Request, res: Response) => {
+    const provider = state.providerManager.getById(req.params.id);
+    if (!provider) {
+      res.status(404).json({ type: 'error', error: { type: 'not_found_error', message: 'Provider not found.' } });
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const r = await fetch(`${provider.baseUrl}/models`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${provider.apiKey}`,
+        },
+        signal: controller.signal,
+      });
+      const text = await r.text();
+      let parsed: unknown = text;
+      try { parsed = text ? JSON.parse(text) : null; } catch { /* keep text */ }
+      if (!r.ok) {
+        const errBody = parsed as { error?: { message?: string } } | null;
+        const errMsg = errBody?.error?.message ?? `Upstream returned status ${r.status}`;
+        res.status(502).json({ type: 'error', error: { type: 'api_error', message: errMsg } });
+        return;
+      }
+      const arr = Array.isArray((parsed as { data?: unknown[] })?.data)
+        ? (parsed as { data: Array<{ id?: string }> }).data.map((m) => m.id).filter((id): id is string => typeof id === 'string')
+        : [];
+
+      const isActive = state.providerManager.snapshot().activeId === provider.id;
+
+      if (isActive && arr.length > 0) {
+        // ── Sync into model registry cache ──────────────────────
+        state.modelRegistry.setCachedModels(arr);
+
+        // ── Remap all mappings + family rules to this provider ──
+        // Pick the target model: prefer the provider's configured defaultModel
+        // if it exists in the list, otherwise use the first model.
+        const target = arr.includes(provider.defaultModel)
+          ? provider.defaultModel
+          : arr[0];
+
+        // Update every exact mapping to the target model
+        const snap = state.modelRegistry.snapshot();
+        const newMappings: Record<string, string> = {};
+        for (const claudeModel of Object.keys(snap.mappings)) {
+          newMappings[claudeModel] = target;
+        }
+        if (Object.keys(newMappings).length > 0) {
+          state.modelRegistry.replace({ mappings: newMappings, default: target });
+        } else {
+          state.modelRegistry.setDefault(target);
+        }
+
+        // Update family rules — primary = target, backup = second model if available
+        const backup = arr.find((m) => m !== target);
+        const updatedRules = snap.familyRules.map((rule) => ({
+          name: rule.name,
+          pattern: rule.pattern,
+          primary: target,
+          ...(backup ? { backup } : {}),
+        }));
+        if (updatedRules.length > 0) {
+          state.modelRegistry.replaceFamilyRules(updatedRules);
+        }
+
+        // Sync default into config
+        state.configManager.update({ defaultModel: target });
+
+        logger.info(
+          { providerId: provider.id, target, modelCount: arr.length },
+          'provider_sync_mappings_updated',
+        );
+
+        res.json({
+          models: arr,
+          syncedAt: new Date().toISOString(),
+          remapped: true,
+          target,
+          updatedMappings: Object.keys(newMappings).length,
+        });
+      } else {
+        // Not active or no models — just cache the list, don't touch mappings
+        if (arr.length > 0) {
+          state.modelRegistry.setCachedModels(arr);
+        }
+        res.json({
+          models: arr,
+          syncedAt: new Date().toISOString(),
+          remapped: false,
+        });
+      }
+    } catch (err) {
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      res.status(502).json({
+        type: 'error',
+        error: { type: 'api_error', message: isAbort ? 'Request timed out' : 'Upstream request failed' },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+
   // GET /admin/api/events — SSE stream of new request records
-  router.get('/events', (req: Request, res: Response) => {
-    res.setHeader('Content-Type', 'text/event-stream');
+  router.get('/events', (req: Request, res: Response) => {    res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
@@ -424,6 +798,170 @@ export function buildAdminApiRouter(state: AdminState): Router {
 
     req.on('close', cleanup);
     res.on('close', cleanup);
+  });
+
+  // ── Context Management Routes ─────────────────────────────────────────────
+  // Mount all /admin/api/context/* endpoints
+  router.use('/context', buildContextRouter(state.contextTracker));
+
+  // ── Local Claude Integration ──────────────────────────────────────────────
+
+  function getClaudeJsonPath(): string {
+    return nodePath.join(os.homedir(), '.claude.json');
+  }
+
+  function readClaudeJson(filePath: string): Record<string, unknown> {
+    try {
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+
+  // GET /admin/api/claude-local/status
+  // Reads ~/.claude.json and reports whether ANTHROPIC_BASE_URL points at this proxy.
+  router.get('/claude-local/status', (_req: Request, res: Response) => {
+    const filePath = getClaudeJsonPath();
+    const proxyPort = getConfig().port;
+    const proxyBaseUrl = `http://localhost:${proxyPort}`;
+
+    let fileExists = false;
+    let readable = false;
+    let currentBaseUrl: string | null = null;
+    let currentAuthToken: string | null = null;
+    let currentModel: string | null = null;
+    let configured = false;
+    let partial = false;
+
+    try {
+      fs.accessSync(filePath, fs.constants.R_OK);
+      fileExists = true;
+      readable = true;
+      const data = readClaudeJson(filePath);
+      const env = (data.env ?? {}) as Record<string, string>;
+      currentBaseUrl = env['ANTHROPIC_BASE_URL'] ?? null;
+      currentAuthToken = env['ANTHROPIC_AUTH_TOKEN'] ?? null;
+      currentModel = env['ANTHROPIC_MODEL'] ?? null;
+
+      if (currentBaseUrl) {
+        // Normalise trailing slashes for comparison
+        const normCurrent = currentBaseUrl.replace(/\/+$/, '');
+        const normProxy = proxyBaseUrl.replace(/\/+$/, '');
+        configured = normCurrent === normProxy;
+        partial = !configured; // file has a URL but it's different
+      }
+    } catch {
+      // file missing or unreadable
+      if (fileExists) readable = false;
+    }
+
+    res.json({
+      claudeJsonPath: filePath,
+      fileExists,
+      readable,
+      configured,
+      partial,
+      currentBaseUrl,
+      currentAuthToken: currentAuthToken ? '••••' : null,
+      currentModel,
+      proxyBaseUrl,
+    });
+  });
+
+  // POST /admin/api/claude-local/configure
+  // Merges the proxy env block into ~/.claude.json (creates file if absent).
+  router.post('/claude-local/configure', (req: Request, res: Response) => {
+    const filePath = getClaudeJsonPath();
+    const proxyPort = getConfig().port;
+    const proxyBaseUrl = `http://localhost:${proxyPort}`;
+    const rawProxyApiKey = state.configManager.getProxyApiKey();
+    const authToken = rawProxyApiKey.trim() ? rawProxyApiKey.trim() : 'local-proxy-key';
+    const defaultModel = state.configManager.getDefaultModel();
+
+    // Allow caller to override values
+    const body = req.body as { authToken?: string; model?: string } | undefined;
+    const finalAuthToken = body?.authToken?.trim() || authToken;
+    const finalModel = body?.model?.trim() || defaultModel;
+
+    try {
+      // Read existing file (or empty object)
+      let existing: Record<string, unknown> = {};
+      try {
+        fs.accessSync(filePath, fs.constants.R_OK);
+        existing = readClaudeJson(filePath);
+      } catch {
+        // file doesn't exist yet — start fresh
+      }
+
+      // Deep-merge: preserve all existing top-level keys, only update env sub-keys
+      const existingEnv = (existing.env ?? {}) as Record<string, string>;
+      const updatedEnv = {
+        ...existingEnv,
+        ANTHROPIC_BASE_URL: proxyBaseUrl,
+        ANTHROPIC_AUTH_TOKEN: finalAuthToken,
+        ANTHROPIC_MODEL: finalModel,
+      };
+
+      const updated: Record<string, unknown> = {
+        ...existing,
+        env: updatedEnv,
+      };
+
+      // Write atomically via temp file + rename where possible
+      const tmpPath = filePath + '.tmp';
+      fs.writeFileSync(tmpPath, JSON.stringify(updated, null, 2) + '\n', 'utf-8');
+      fs.renameSync(tmpPath, filePath);
+
+      logger.info({ filePath, proxyBaseUrl, finalModel }, 'claude_local_configured');
+
+      res.json({
+        ok: true,
+        claudeJsonPath: filePath,
+        written: {
+          ANTHROPIC_BASE_URL: proxyBaseUrl,
+          ANTHROPIC_AUTH_TOKEN: '••••',
+          ANTHROPIC_MODEL: finalModel,
+        },
+      });
+    } catch (err) {
+      logger.error({ err, filePath }, 'claude_local_configure_failed');
+      res.status(500).json({
+        type: 'error',
+        error: {
+          type: 'api_error',
+          message: `Failed to write ${filePath}: ${(err as Error).message}`,
+        },
+      });
+    }
+  });
+
+  // POST /admin/api/claude-local/open
+  // Opens ~/.claude.json in Notepad
+  router.post('/claude-local/open', (_req: Request, res: Response) => {
+    const filePath = getClaudeJsonPath();
+    try {
+      const { exec } = require('node:child_process');
+      const command = process.platform === 'win32' 
+        ? `start notepad "${filePath}"` 
+        : `open "${filePath}"`;
+        
+      exec(command, (error: Error | null) => {
+        if (error) {
+          logger.error({ err: error, filePath }, 'claude_local_open_failed');
+        }
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error({ err, filePath }, 'claude_local_open_failed');
+      res.status(500).json({
+        type: 'error',
+        error: {
+          type: 'api_error',
+          message: `Failed to open ${filePath}: ${(err as Error).message}`,
+        },
+      });
+    }
   });
 
   return router;

@@ -824,15 +824,54 @@ export function buildMessagesRouter(service: BluesmindsService, state: AdminStat
 
       res.locals = { ...(res.locals ?? {}), providerModel };
 
+      // ── Auto-Compact: process messages through context tracker ──────────────
+      // This checks token usage, triggers compaction if needed, and injects
+      // session context from previous compactions. Operates on the converted
+      // OpenAI message array.
+      let processedRequest = conversion.request;
+      try {
+        const summarizerConfig = {
+          baseUrl: state.configManager.getBaseUrl(),
+          apiKey: state.configManager.getApiKey(),
+          model: providerModel,
+          timeoutMs: Math.min(30000, state.configManager.getRequestTimeoutMs()),
+        };
+        const { messages: compactedMessages, compactionResult } =
+          await state.contextTracker.process(
+            conversion.request.messages,
+            providerModel,
+            summarizerConfig,
+          );
+        processedRequest = { ...conversion.request, messages: compactedMessages };
+        if (compactionResult) {
+          logger.info(
+            {
+              sessionId: compactionResult.sessionId,
+              level: compactionResult.level,
+              tokensSaved: compactionResult.tokensSaved,
+              tokensAfter: compactionResult.tokensAfterCompaction,
+            },
+            'auto_compact_applied',
+          );
+        }
+      } catch (compactErr) {
+        // Context tracking is best-effort — never block a request due to compaction errors
+        logger.warn(
+          { err: compactErr instanceof Error ? compactErr.message : String(compactErr) },
+          'auto_compact_skipped_on_error',
+        );
+      }
+      // ── End Auto-Compact ───────────────────────────────────────────────────
+
       const wantsStream = (req.body as { stream?: boolean }).stream === true;
       if (wantsStream) {
         res.locals = { ...(res.locals ?? {}), __skipLogCapture: true };
-        await handleStreaming(req, res, service, providerModel, originalClientModel, conversion.request, state, backupModel);
+        await handleStreaming(req, res, service, providerModel, originalClientModel, processedRequest, state, backupModel);
         return;
       }
 
       // Non-streaming path
-      const openaiRequest = { ...conversion.request, model: providerModel, stream: false };
+      const openaiRequest = { ...processedRequest, model: providerModel, stream: false };
       const upstream = await service.createChatCompletion(openaiRequest, backupModel);
 
       if (!upstream.ok) {

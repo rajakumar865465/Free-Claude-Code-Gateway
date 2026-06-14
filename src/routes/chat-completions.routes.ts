@@ -27,10 +27,31 @@ export function buildChatCompletionsRouter(service: BluesmindsService, _state: A
 
     res.locals = { ...(res.locals ?? {}), providerModel: body.model };
 
+    // ── Auto-Compact: track context usage for this session ────────────────────
+    let processedMessages = body.messages as OpenAIChatCompletionsRequest['messages'];
+    try {
+      const summarizerConfig = {
+        baseUrl: _state.configManager.getBaseUrl(),
+        apiKey: _state.configManager.getApiKey(),
+        model: body.model,
+        timeoutMs: 30000,
+      };
+      const { messages: compacted } = await _state.contextTracker.process(
+        body.messages as OpenAIChatCompletionsRequest['messages'],
+        body.model,
+        summarizerConfig,
+      );
+      processedMessages = compacted;
+    } catch {
+      // Best-effort — never block request
+    }
+    // ── End Auto-Compact ───────────────────────────────────────────────────
+
     // ── Streaming path ────────────────────────────────────────────────────────
     if (body.stream === true) {
       const upstream = await service.createChatCompletionStream({
         ...(body as OpenAIChatCompletionsRequest),
+        messages: processedMessages,
         stream: true,
       });
 
@@ -81,6 +102,7 @@ export function buildChatCompletionsRouter(service: BluesmindsService, _state: A
     // ── Non-streaming path ────────────────────────────────────────────────────
     const upstream = await service.createChatCompletion({
       ...(body as OpenAIChatCompletionsRequest),
+      messages: processedMessages,
       stream: false,
     });
 

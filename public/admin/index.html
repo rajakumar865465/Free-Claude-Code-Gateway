@@ -59,6 +59,11 @@
         </a>
 
         <div class="nav-section-label">System</div>
+        <a class="nav-item" data-view="context" href="#context">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h10M7 12h6"/></svg>
+          <span>Auto-Compact</span>
+          <span class="ctx-badge hidden" id="ctx-nav-badge">!</span>
+        </a>
         <a class="nav-item" data-view="settings" href="#settings">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
           <span>Settings</span>
@@ -99,6 +104,16 @@
           </div>
 
           <span class="env-badge" id="env-badge" title="Current environment">local</span>
+
+          <!-- Active Provider Switcher Dropdown -->
+          <div class="provider-switcher" id="provider-switcher" style="display:none">
+            <button class="provider-switcher-btn" id="provider-switcher-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
+              <span class="status-dot live" style="width:6px;height:6px;flex-shrink:0"></span>
+              <span class="provider-switcher-name" id="provider-switcher-name">Provider</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;flex-shrink:0;color:var(--text-muted)"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="provider-switcher-menu hidden" id="provider-switcher-menu" role="listbox"></div>
+          </div>
 
           <div class="conn-wrap" id="conn-pill">
             <span class="status-dot live"></span>
@@ -172,6 +187,61 @@
 
           <!-- KPI Grid -->
           <div class="kpi-grid" id="kpi-grid"></div>
+
+          <!-- Context Usage Panel (Auto-Compact) -->
+          <div class="ctx-panel ctx-state-ok" id="ctx-overview-panel">
+            <div class="ctx-panel-header">
+              <div class="ctx-panel-title">
+                <div class="ctx-panel-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h10M7 12h6"/></svg>
+                </div>
+                <span>Context Window</span>
+                <span class="badge badge-muted" id="ctx-overview-status-badge" style="font-size:10px;padding:2px 8px;">Loading…</span>
+              </div>
+              <div class="ctx-panel-actions">
+                <div class="ctx-toggle" id="ctx-toggle-wrap" title="Toggle Auto-Compact">
+                  <span>Auto Compact</span>
+                  <div class="ctx-toggle-track on" id="ctx-toggle-track" role="switch" aria-checked="true" tabindex="0">
+                    <div class="ctx-toggle-thumb"></div>
+                  </div>
+                </div>
+                <button class="ctx-compact-btn" id="ctx-compact-now-btn" type="button" title="Manually trigger compaction">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Compact Now
+                </button>
+                <a href="#context" data-view="context" class="btn btn-ghost btn-sm" style="font-size:11px;">Details →</a>
+              </div>
+            </div>
+
+            <div>
+              <div class="ctx-usage-row">
+                <span class="ctx-usage-label">Context Usage</span>
+                <span class="ctx-usage-value ok" id="ctx-usage-pct-text">0%</span>
+              </div>
+              <div class="ctx-usage-bar">
+                <div class="ctx-usage-fill" id="ctx-usage-fill" style="width:0%"></div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:3px;">
+                <span style="font-size:11px;color:var(--text-muted);" id="ctx-tokens-detail">0 / 200K tokens</span>
+                <span style="font-size:11px;color:var(--text-muted);">Threshold: <span id="ctx-threshold-pct">80</span>%</span>
+              </div>
+            </div>
+
+            <div class="ctx-stats-row">
+              <div class="ctx-stat">
+                <div class="ctx-stat-value" id="ctx-stat-compactions">0</div>
+                <div class="ctx-stat-label">Compactions</div>
+              </div>
+              <div class="ctx-stat">
+                <div class="ctx-stat-value" id="ctx-stat-saved">0</div>
+                <div class="ctx-stat-label">Tokens Saved</div>
+              </div>
+              <div class="ctx-stat">
+                <div class="ctx-stat-value" id="ctx-stat-sessions">0</div>
+                <div class="ctx-stat-label">Sessions</div>
+              </div>
+            </div>
+          </div>
 
           <!-- Main Analytics: Requests + Latency -->
           <div class="grid-2col grid-analytics">
@@ -584,94 +654,110 @@
 
         <!-- ═══════════════════════ PROVIDERS ══════════════════ -->
         <section class="view" data-view="providers" hidden>
+
+          <!-- Active Provider Banner -->
+          <div class="provider-active-banner" id="provider-active-banner" style="display:none">
+            <div class="provider-active-left">
+              <span class="status-dot live"></span>
+              <span class="provider-active-label">Active Provider:</span>
+              <strong class="provider-active-name" id="provider-active-name">—</strong>
+              <span class="provider-active-meta" id="provider-active-meta"></span>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="provider-deactivate-btn" type="button">Use .env defaults</button>
+          </div>
+
+          <!-- Page Header -->
           <div class="page-header">
             <div class="page-header-text">
               <h2>Providers</h2>
-              <p>Manage upstream AI provider connections, API keys, base URLs, and discover new integrations.</p>
+              <p>Add multiple OpenAI-compatible providers. Switch the active one in one click — all requests immediately route to it.</p>
             </div>
             <div class="page-header-actions">
-              <button id="provider-test-all" class="btn btn-outline" type="button">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                Test All
-              </button>
-              <button id="provider-fetch-models" class="btn btn-primary" type="button">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
-                Sync Models
+              <button id="provider-add-btn" class="btn btn-primary" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Provider
               </button>
             </div>
           </div>
 
-          <div class="provider-grid" id="provider-grid"></div>
+          <!-- Provider Cards Grid -->
+          <div id="provider-list-wrap">
+            <div class="provider-empty hidden" id="provider-empty">
+              <div class="provider-empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+              </div>
+              <h3>No providers added yet</h3>
+              <p>Add your first OpenAI-compatible provider to get started. You can add Kimi, DeepSeek, OpenRouter, GLM, or any custom endpoint.</p>
+              <button class="btn btn-primary" id="provider-empty-add" type="button">Add Provider</button>
+            </div>
+            <div class="provider-cards" id="provider-cards"></div>
+          </div>
 
-          <div class="panel">
-            <div class="panel-head"><h2>Provider Marketplace</h2></div>
-            <p class="help-text" style="margin-bottom:14px">Connect additional providers as they become available.</p>
-            <div class="marketplace-grid">
-              <div class="marketplace-card active">
-                <div class="marketplace-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-                </div>
-                <div class="marketplace-info">
-                  <span class="marketplace-name">OpenAI Compatible</span>
-                </div>
-                <span class="badge badge-success">Active</span>
+          <!-- Add / Edit Provider Modal -->
+          <div class="modal-overlay hidden" id="provider-modal-overlay">
+            <div class="modal" id="provider-modal" role="dialog" aria-modal="true" aria-labelledby="provider-modal-title">
+              <div class="modal-header">
+                <h2 class="modal-title" id="provider-modal-title">Add Provider</h2>
+                <button class="modal-close" id="provider-modal-close" type="button" aria-label="Close">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
               </div>
-              <div class="marketplace-card disabled">
-                <div class="marketplace-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+              <div class="modal-body">
+                <input type="hidden" id="provider-modal-id" value="" />
+                <div class="form-grid">
+                  <label class="form-field">
+                    <span class="form-label">Provider Name <span class="form-required">*</span></span>
+                    <input id="pf-name" type="text" placeholder="e.g. Kimi, DeepSeek, OpenRouter" autocomplete="off" />
+                    <span class="form-hint">Display name — for your reference only.</span>
+                  </label>
+                  <label class="form-field">
+                    <span class="form-label">Base URL <span class="form-required">*</span></span>
+                    <input id="pf-baseurl" type="url" placeholder="https://api.moonshot.cn/v1" autocomplete="off" />
+                    <span class="form-hint">Must include <code>/v1</code> path if required by the provider.</span>
+                  </label>
+                  <label class="form-field">
+                    <span class="form-label">API Key</span>
+                    <div class="input-with-icon">
+                      <input id="pf-apikey" type="password" placeholder="sk-…" autocomplete="new-password" />
+                      <button class="input-eye-btn" type="button" id="pf-apikey-toggle" tabindex="-1" aria-label="Show/hide key">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="pf-eye-icon"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      </button>
+                    </div>
+                    <span class="form-hint" id="pf-apikey-hint">Leave blank to keep existing key when editing.</span>
+                  </label>
+                  <label class="form-field">
+                    <span class="form-label">Default Model <span class="form-required">*</span></span>
+                    <div class="model-combo" id="pf-model-combo">
+                      <input id="pf-model" type="text" placeholder="e.g. kimi-k2.6, deepseek-chat, gpt-4o" autocomplete="off" />
+                      <button class="model-combo-arrow" id="pf-model-arrow" type="button" tabindex="-1" aria-label="Show model list" style="display:none">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                      </button>
+                      <div class="model-combo-dropdown hidden" id="pf-model-dropdown"></div>
+                    </div>
+                    <span class="form-hint" id="pf-model-hint">Used for connection tests and as the fallback model.</span>
+                  </label>
+                  <label class="form-field form-field-full">
+                    <span class="form-label">Notes</span>
+                    <textarea id="pf-notes" rows="2" placeholder="Optional notes — tier, pricing, limits…"></textarea>
+                  </label>
                 </div>
-                <div class="marketplace-info">
-                  <span class="marketplace-name">Anthropic Compatible</span>
-                </div>
-                <span class="badge badge-muted">Soon</span>
               </div>
-              <div class="marketplace-card disabled">
-                <div class="marketplace-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 000 20 14.5 14.5 0 000-20"/><path d="M2 12h20"/></svg>
+              <div class="modal-footer">
+                <div class="modal-footer-left">
+                  <button class="btn btn-outline btn-sm" type="button" id="pf-test-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    Test Connection
+                  </button>
+                  <span class="pf-test-result" id="pf-test-result"></span>
                 </div>
-                <div class="marketplace-info">
-                  <span class="marketplace-name">OpenRouter</span>
+                <div class="modal-footer-right">
+                  <button class="btn btn-ghost" type="button" id="pf-cancel-btn">Cancel</button>
+                  <button class="btn btn-primary" type="button" id="pf-save-btn">Save Provider</button>
                 </div>
-                <span class="badge badge-muted">Soon</span>
-              </div>
-              <div class="marketplace-card disabled">
-                <div class="marketplace-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                </div>
-                <div class="marketplace-info">
-                  <span class="marketplace-name">AWS Bedrock</span>
-                </div>
-                <span class="badge badge-muted">Soon</span>
-              </div>
-              <div class="marketplace-card disabled">
-                <div class="marketplace-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                </div>
-                <div class="marketplace-info">
-                  <span class="marketplace-name">Google Gemini</span>
-                </div>
-                <span class="badge badge-muted">Soon</span>
-              </div>
-              <div class="marketplace-card disabled">
-                <div class="marketplace-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
-                </div>
-                <div class="marketplace-info">
-                  <span class="marketplace-name">Ollama</span>
-                </div>
-                <span class="badge badge-muted">Soon</span>
-              </div>
-              <div class="marketplace-card disabled">
-                <div class="marketplace-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
-                </div>
-                <div class="marketplace-info">
-                  <span class="marketplace-name">Custom HTTP</span>
-                </div>
-                <span class="badge badge-muted">Soon</span>
               </div>
             </div>
           </div>
+
         </section>
 
         <!-- ═══════════════════════ MODELS ════════════════════ -->
@@ -1114,6 +1200,44 @@
                 </div>
                 <div id="ops-health-result" class="test-result" hidden></div>
               </div>
+
+              <!-- Local Claude Integration -->
+              <div class="settings-section lci-section" id="local-claude-section">
+                <div class="settings-section-head">
+                  <h3>
+                    <span class="section-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><polyline points="8 21 12 21 16 21"/><line x1="12" y1="17" x2="12" y2="21"/><circle cx="17" cy="7" r="2" fill="currentColor" stroke="none" opacity=".6"/><circle cx="12" cy="7" r="2" fill="currentColor" stroke="none" opacity=".4"/><circle cx="7" cy="7" r="2" fill="currentColor" stroke="none" opacity=".25"/></svg>
+                    </span>
+                    Local Claude Code Integration
+                  </h3>
+                  <p>Point your local Claude Code CLI at this proxy with one click. Reads and writes <code>~/.claude.json</code>.</p>
+                </div>
+
+                <!-- Status card — populated by JS -->
+                <div class="lci-status-card" id="lci-status-card">
+                  <div class="lci-status-card-inner lci-loading">
+                    <span class="lci-spinner"></span>
+                    <span class="lci-status-text">Checking configuration…</span>
+                  </div>
+                </div>
+
+                <div class="form-actions" style="margin-top:14px">
+                  <button type="button" class="btn btn-outline" id="lci-test-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    Test
+                  </button>
+                  <button type="button" class="btn btn-primary" id="lci-configure-btn" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="13 2 13 9 20 9"/><path d="M20 14v5a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h7"/><polyline points="10 17 8 19 6 17"/></svg>
+                    Auto-Configure Claude
+                  </button>
+                  <button type="button" class="btn btn-outline" id="lci-open-btn" style="margin-left:8px" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                    Open File
+                  </button>
+                </div>
+                <div id="lci-result" class="test-result" hidden></div>
+              </div>
+
             </div>
 
             <div id="config-status" class="status-line" aria-live="polite" style="margin-top:16px; text-align:right"></div>
@@ -1215,6 +1339,212 @@
                   <p>Provider did not respond within the configured timeout. Increase it in Settings → Limits.</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════ AUTO-COMPACT CONTEXT ════════ -->
+        <section class="view" data-view="context" hidden>
+          <div class="page-header page-header-compact">
+            <div class="page-header-text">
+              <h2>Auto-Compact Context</h2>
+              <p>Tracks token usage, automatically compacts large conversations, and preserves session state — so you never hit a context limit.</p>
+            </div>
+            <div class="page-header-actions">
+              <button id="ctx-refresh-btn" class="btn btn-outline btn-sm" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                Refresh
+              </button>
+              <button id="ctx-clear-all-btn" class="btn btn-outline-danger btn-sm" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                Clear All Sessions
+              </button>
+            </div>
+          </div>
+
+          <!-- Context Usage Summary -->
+          <div class="ctx-panel ctx-state-ok" id="ctx-main-panel">
+            <div class="ctx-panel-header">
+              <div class="ctx-panel-title">
+                <div class="ctx-panel-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h10M7 12h6"/></svg>
+                </div>
+                <span>Context Usage Overview</span>
+              </div>
+              <div class="ctx-panel-actions">
+                <div class="ctx-toggle" id="ctx-main-toggle-wrap" title="Toggle Auto-Compact">
+                  <span>Auto Compact: </span>
+                  <strong id="ctx-main-enabled-label">ON</strong>
+                  <div class="ctx-toggle-track on" id="ctx-main-toggle-track" role="switch" aria-checked="true" tabindex="0">
+                    <div class="ctx-toggle-thumb"></div>
+                  </div>
+                </div>
+                <button class="ctx-compact-btn" id="ctx-main-compact-btn" type="button">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Compact Now
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div class="ctx-usage-row">
+                <span class="ctx-usage-label">Aggregate Context Usage</span>
+                <span class="ctx-usage-value ok" id="ctx-main-pct-text">0%</span>
+              </div>
+              <div class="ctx-usage-bar" style="height:10px;">
+                <div class="ctx-usage-fill" id="ctx-main-fill" style="width:0%"></div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+                <span style="font-size:11px;color:var(--text-muted);" id="ctx-main-tokens-detail">0 / 0 tokens</span>
+                <span style="font-size:11px;color:var(--text-muted);">Threshold: <strong id="ctx-main-threshold">80</strong>% · Keep: <strong id="ctx-main-keep">20</strong> msgs</span>
+              </div>
+            </div>
+
+            <div class="ctx-stats-row" style="grid-template-columns:repeat(5,1fr)">
+              <div class="ctx-stat">
+                <div class="ctx-stat-value" id="ctx-main-compactions">0</div>
+                <div class="ctx-stat-label">Compactions</div>
+              </div>
+              <div class="ctx-stat">
+                <div class="ctx-stat-value" id="ctx-main-saved">0</div>
+                <div class="ctx-stat-label">Tokens Saved</div>
+              </div>
+              <div class="ctx-stat">
+                <div class="ctx-stat-value" id="ctx-main-sessions">0</div>
+                <div class="ctx-stat-label">Sessions</div>
+              </div>
+              <div class="ctx-stat">
+                <div class="ctx-stat-value" id="ctx-main-near">0</div>
+                <div class="ctx-stat-label">Near Limit</div>
+              </div>
+              <div class="ctx-stat">
+                <div class="ctx-stat-value" id="ctx-main-last">—</div>
+                <div class="ctx-stat-label">Last Compact</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Sessions -->
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Active Sessions</h2>
+                <p class="panel-sub">Conversations tracked by the Auto-Compact system, sorted by usage.</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="ctx-sessions-refresh" type="button">Refresh</button>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table" id="ctx-sessions-table">
+                <thead>
+                  <tr>
+                    <th>Session ID</th>
+                    <th>Model</th>
+                    <th>Context Usage</th>
+                    <th class="num">Messages</th>
+                    <th class="num">Compactions</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="ctx-sessions-tbody">
+                  <tr><td colspan="6" class="empty-row">No active sessions</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Settings + History row -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+            <!-- Auto-Compact Settings -->
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>Auto-Compact Settings</h2>
+                  <p class="panel-sub">Configure thresholds and behavior.</p>
+                </div>
+                <button class="btn btn-primary btn-sm" id="ctx-save-settings-btn" type="button">Save</button>
+              </div>
+              <div class="ctx-settings-grid">
+                <div class="ctx-settings-field">
+                  <label class="ctx-settings-label" for="ctx-setting-threshold">Compact Threshold (%)</label>
+                  <input class="ctx-settings-input" id="ctx-setting-threshold" type="number" min="50" max="99" value="80" />
+                  <span class="ctx-settings-hint">Trigger compaction when usage exceeds this %</span>
+                </div>
+                <div class="ctx-settings-field">
+                  <label class="ctx-settings-label" for="ctx-setting-warn">Warn Threshold (%)</label>
+                  <input class="ctx-settings-input" id="ctx-setting-warn" type="number" min="40" max="98" value="70" />
+                  <span class="ctx-settings-hint">Show warning indicator above this %</span>
+                </div>
+                <div class="ctx-settings-field">
+                  <label class="ctx-settings-label" for="ctx-setting-keep">Keep Recent Messages</label>
+                  <input class="ctx-settings-input" id="ctx-setting-keep" type="number" min="5" max="100" value="20" />
+                  <span class="ctx-settings-hint">Always preserve this many recent messages</span>
+                </div>
+                <div class="ctx-settings-field">
+                  <label class="ctx-settings-label" for="ctx-setting-ctxsize">Default Context Size</label>
+                  <input class="ctx-settings-input" id="ctx-setting-ctxsize" type="number" min="1000" step="1000" value="200000" />
+                  <span class="ctx-settings-hint">Fallback window size if model is unknown</span>
+                </div>
+              </div>
+              <div style="margin-top:12px;display:flex;gap:10px;align-items:center;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;">
+                  <input type="checkbox" id="ctx-setting-summary" checked style="width:14px;height:14px;accent-color:var(--primary);" />
+                  Generate AI summaries during compaction
+                </label>
+              </div>
+            </div>
+
+            <!-- Compaction History -->
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>Compaction History</h2>
+                  <p class="panel-sub">Recent compaction events and results.</p>
+                </div>
+              </div>
+              <div class="table-wrap" style="max-height:280px;overflow-y:auto;">
+                <table class="data-table data-table-dense" id="ctx-history-table">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Level</th>
+                      <th class="num">Saved</th>
+                      <th class="num">Before→After</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ctx-history-tbody">
+                    <tr><td colspan="4" class="empty-row">No compaction history</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-soft);display:flex;gap:12px;font-size:12px;color:var(--text-muted);">
+                <span>Total: <strong id="ctx-hist-total">0</strong> compactions</span>
+                <span>Saved: <strong id="ctx-hist-saved-total">0</strong> tokens</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- How it works info panel -->
+          <div class="panel" style="background:var(--bg-subtle);">
+            <div class="panel-head">
+              <h2>How Auto-Compact Works</h2>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;font-size:13px;">
+              <div>
+                <div style="font-weight:700;color:var(--warn-text);margin-bottom:6px;">Level 1 — Prune</div>
+                <p style="color:var(--text-secondary);line-height:1.6;">Triggered at 80% usage. Removes tool outputs and large file reads from older messages. Keeps all user instructions. Saves ~20–40%.</p>
+              </div>
+              <div>
+                <div style="font-weight:700;color:var(--err-text);margin-bottom:6px;">Level 2 — Summarize</div>
+                <p style="color:var(--text-secondary);line-height:1.6;">Triggered at 90% usage. Replaces old messages with an AI-generated structured summary. Keeps last 20 messages intact. Saves ~50–75%.</p>
+              </div>
+              <div>
+                <div style="font-weight:700;color:var(--accent-text);margin-bottom:6px;">Level 3 — Reset</div>
+                <p style="color:var(--text-secondary);line-height:1.6;">Triggered at 97% usage. Creates a fresh context with only system prompts, session summary, and last 5 messages. Saves ~80–95%.</p>
+              </div>
+            </div>
+            <div style="margin-top:12px;padding:10px 14px;background:var(--primary-soft);border-radius:var(--radius-sm);border:1px solid rgba(37,99,235,0.15);font-size:12.5px;color:var(--text-secondary);">
+              <strong style="color:var(--primary);">Safety:</strong> System prompts, model settings, routing rules, and project state are <em>never removed</em>. After compaction, the session continues automatically — no user intervention required.
             </div>
           </div>
         </section>
