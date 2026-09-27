@@ -19,6 +19,7 @@ export const DEFAULT_FAMILY_RULES: FamilyRule[] = [
 const DEFAULT_CONFIG: ModelMappingConfig = {
   anthropic_to_bluesminds: {
     'claude-opus-5-5':            'z-ai/glm-5.1',
+    'claude-opus-5':              'z-ai/glm-5.1',
     'claude-sonnet-5':            'z-ai/glm-5.1',
     'claude-fable-5-1':           'z-ai/glm-5.1',
     'claude-mythos-5-1':          'z-ai/glm-5.1',

@@ -1,6 +1,7 @@
 {
   "anthropic_to_bluesminds": {
     "claude-opus-5-5":    "kimi-k2.6",
+    "claude-opus-5":      "kimi-k2.6",
     "claude-sonnet-5":    "kimi-k2.6",
     "claude-fable-5-1":   "kimi-k2.6",
     "claude-mythos-5-1":  "kimi-k2.6",

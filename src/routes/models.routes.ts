@@ -12,6 +12,7 @@ interface StandardModelDef {
 
 const STANDARD_CLAUDE_MODELS: StandardModelDef[] = [
   { id: 'claude-opus-5-5', display_name: 'Claude Opus 5.5', created_at: '2026-09-01T00:00:00Z', created: 1788220800 },
+  { id: 'claude-opus-5', display_name: 'Claude Opus 5', created_at: '2026-09-01T00:00:00Z', created: 1788220800 },
   { id: 'claude-sonnet-5', display_name: 'Claude Sonnet 5', created_at: '2026-09-01T00:00:00Z', created: 1788220800 },
   { id: 'claude-fable-5-1', display_name: 'Claude Fable 5.1', created_at: '2026-09-01T00:00:00Z', created: 1788220800 },
   { id: 'claude-mythos-5-1', display_name: 'Claude Mythos 5.1', created_at: '2026-09-01T00:00:00Z', created: 1788220800 },
