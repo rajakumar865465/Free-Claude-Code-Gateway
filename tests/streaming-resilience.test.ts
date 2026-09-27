@@ -110,9 +110,9 @@ describe('config: streaming resilience env vars', () => {
   beforeEach(() => resetConfigCache());
   after(() => resetConfigCache());
 
-  it('defaults: idleTimeoutMs=12000, keepAlivePingMs=10000', () => {
+  it('defaults: idleTimeoutMs=30000, keepAlivePingMs=10000', () => {
     const cfg = loadConfig({});
-    assert.equal(cfg.idleTimeoutMs, 12_000);
+    assert.equal(cfg.idleTimeoutMs, 30_000);
     assert.equal(cfg.keepAlivePingMs, 10_000);
   });
 
@@ -137,9 +137,9 @@ describe('config: streaming resilience env vars', () => {
     assert.equal(cfg.circuitBreakerRollingMs, 120_000);
   });
 
-  it('defaults: circuitBreakerFailures=3, recoveryMs=30000, rollingMs=60000', () => {
+  it('defaults: circuitBreakerFailures=2, recoveryMs=30000, rollingMs=60000', () => {
     const cfg = loadConfig({});
-    assert.equal(cfg.circuitBreakerFailures, 3);
+    assert.equal(cfg.circuitBreakerFailures, 2);
     assert.equal(cfg.circuitBreakerRecoveryMs, 30_000);
     assert.equal(cfg.circuitBreakerRollingMs, 60_000);
   });

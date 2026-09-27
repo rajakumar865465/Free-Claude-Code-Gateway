@@ -1,15 +1,20 @@
 {
   "anthropic_to_bluesminds": {
-    "claude-opus-4-5-20251101": "kimi-k2.6",
-    "claude-3-5-sonnet-latest":   "kimi-k2.6",
-    "claude-3-7-sonnet-20250219": "kimi-k2.6",
-    "claude-sonnet-4-20250514":   "kimi-k2.6",
-    "claude-opus-4-20250514":     "kimi-k2.6",
-    "claude-haiku-4-20250514":    "kimi-k2.6",
-    "claude-3-haiku-20240307":    "kimi-k2.6"
+    "claude-opus-5-5":    "kimi-k2.6",
+    "claude-sonnet-5":    "kimi-k2.6",
+    "claude-fable-5-1":   "kimi-k2.6",
+    "claude-mythos-5-1":  "kimi-k2.6",
+    "claude-fable-5":     "kimi-k2.6",
+    "claude-mythos-5":    "kimi-k2.6",
+    "claude-opus-4-8":    "kimi-k2.6",
+    "claude-opus-4-7":    "kimi-k2.6",
+    "claude-sonnet-4-6":  "kimi-k2.6",
+    "claude-opus-4-6":    "kimi-k2.6"
   },
   "default": "kimi-k2.6",
   "family_rules": [
+    { "name": "Fable",        "pattern": "claude*fable*",  "primary": "kimi-k2.6", "backup": "kimi-k2.5" },
+    { "name": "Mythos",       "pattern": "claude*mythos*", "primary": "kimi-k2.6", "backup": "kimi-k2.5" },
     { "name": "Haiku",        "pattern": "claude*haiku*",  "primary": "kimi-k2.6", "backup": "kimi-k2.5" },
     { "name": "Sonnet",       "pattern": "claude*sonnet*", "primary": "kimi-k2.6", "backup": "kimi-k2.5" },
     { "name": "Opus",         "pattern": "claude*opus*",   "primary": "kimi-k2.6", "backup": "kimi-k2.5" },

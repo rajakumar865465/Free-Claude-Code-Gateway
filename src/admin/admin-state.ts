@@ -6,6 +6,9 @@ import { ConnectionTester } from './connection-tester';
 import { ProviderManager } from './provider-manager';
 import { ContextTracker } from '../auto-compact/context-tracker';
 import { MemoryStore } from '../auto-compact/memory-store';
+import { ProviderFailoverEngine } from '../provider-failover/engine';
+import { FailoverStorage } from '../provider-failover/storage';
+import { GatewayKeyManager } from './gateway-key-manager';
 
 export class AdminState {
   readonly requestLog: RequestLog;
@@ -16,6 +19,8 @@ export class AdminState {
   readonly providerManager: ProviderManager;
   readonly contextTracker: ContextTracker;
   readonly memoryStore: MemoryStore;
+  readonly failoverEngine: ProviderFailoverEngine;
+  readonly gatewayKeyManager: GatewayKeyManager;
 
   constructor(clearLogOnRestart = false) {
     this.requestLog = new RequestLog(1000, clearLogOnRestart);
@@ -30,5 +35,11 @@ export class AdminState {
     this.connectionTester = new ConnectionTester(this.configManager);
     this.memoryStore = new MemoryStore();
     this.contextTracker = new ContextTracker(this.memoryStore);
+    this.failoverEngine = new ProviderFailoverEngine(new FailoverStorage(), this.providerManager);
+    this.gatewayKeyManager = new GatewayKeyManager();
+    
+    if (clearLogOnRestart) {
+      this.failoverEngine.clearSwitchLog();
+    }
   }
 }

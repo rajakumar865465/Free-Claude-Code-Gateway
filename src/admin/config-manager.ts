@@ -4,6 +4,7 @@ import { getConfig, resetConfigCache } from '../config/env';
 import { loadJson, saveJson } from './persist';
 import { setLogLevel } from '../utils/logger';
 import type { ProviderManager } from './provider-manager';
+import { DATABRICKS_BASE_URL } from './provider-manager';
 
 export interface RuntimeConfig {
   bluesmindsBaseUrl: string;
@@ -114,7 +115,13 @@ export class ConfigManager {
     // Active provider takes highest priority
     if (this.providerManager) {
       const active = this.providerManager.getActive();
-      if (active) return active.baseUrl.replace(/\/+$/, '');
+      if (active) {
+        // For Databricks, always use the fixed base URL
+        if (active.type === 'databricks') {
+          return DATABRICKS_BASE_URL;
+        }
+        return active.baseUrl.replace(/\/+$/, '');
+      }
     }
     const v = this.baseUrlOverride ?? getConfig().bluesmindsBaseUrl;
     return v.replace(/\/+$/, '');

@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Provider Failover — FCC Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/admin/assets/dashboard.css" />
+  <style>
+    /* ── Failover-specific styles (uses dashboard CSS vars) ── */
+    body { background: var(--bg); }
+
+    .pf-metric-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;
+    }
+    .pf-metric-card {
+      background: var(--bg-raised); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 22px;
+      box-shadow: var(--shadow-xs);
+    }
+    .pf-metric-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--text-muted); margin-bottom: 14px;
+    }
+    .pf-metric-value {
+      font-size: 28px; font-weight: 700; color: var(--text); line-height: 1;
+    }
+    .pf-metric-sub {
+      font-size: 12px; color: var(--text-secondary); margin-top: 6px;
+    }
+    .pf-toggle-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+    .pf-toggle {
+      position: relative; display: inline-flex; width: 40px; height: 22px;
+      flex-shrink: 0; cursor: pointer;
+    }
+    .pf-toggle input { opacity: 0; width: 0; height: 0; }
+    .pf-slider {
+      position: absolute; inset: 0; background: var(--border-strong);
+      border-radius: 11px; transition: background 0.2s;
+    }
+    .pf-slider:before {
+      content: ''; position: absolute; width: 16px; height: 16px;
+      left: 3px; bottom: 3px; background: #fff; border-radius: 50%;
+      transition: transform 0.2s; box-shadow: var(--shadow-xs);
+    }
+    .pf-toggle input:checked + .pf-slider { background: var(--ok); }
+    .pf-toggle input:checked + .pf-slider:before { transform: translateX(18px); }
+
+    /* Section header */
+    .pf-section-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .pf-section-title {
+      font-size: 15px; font-weight: 600; color: var(--text);
+    }
+    .pf-live-row {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .pf-live-label {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--text-muted);
+    }
+    .pf-live-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--ok);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    /* Provider grid */
+    .pf-provider-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 28px;
+    }
+    @media (max-width: 1100px) { .pf-provider-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 700px) { .pf-provider-grid { grid-template-columns: 1fr; } .pf-metric-grid { grid-template-columns: 1fr; } }
+
+    .pf-provider-card {
+      background: var(--bg-raised); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px;
+      box-shadow: var(--shadow-xs);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .pf-provider-card:hover { box-shadow: var(--shadow-sm); }
+    .pf-provider-card.is-active {
+      border-color: var(--primary);
+      box-shadow: var(--shadow-focus);
+    }
+    .pf-card-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 8px; margin-bottom: 4px;
+    }
+    .pf-card-name {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 14px; font-weight: 600; color: var(--text);
+    }
+    .pf-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .pf-dot-ok  { background: var(--ok); }
+    .pf-dot-warn { background: var(--warn); }
+    .pf-dot-err  { background: var(--err); }
+    .pf-card-model {
+      font-size: 12px; color: var(--text-muted); margin-bottom: 12px;
+      padding-left: 16px; font-family: var(--mono);
+    }
+    .pf-card-divider {
+      border: none; border-top: 1px solid var(--border-soft); margin: 10px 0;
+    }
+    .pf-stat-row {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 12px; padding: 3px 0;
+    }
+    .pf-stat-label { color: var(--text-secondary); }
+    .pf-stat-val { color: var(--text); font-weight: 500; }
+    .pf-stat-err { color: var(--err-text); font-size: 11px; max-width: 160px; text-align: right; word-break: break-all; }
+
+    /* Badge */
+    .pf-badge {
+      display: inline-flex; align-items: center; padding: 2px 8px;
+      border-radius: var(--radius-pill); font-size: 11px; font-weight: 600;
+      flex-shrink: 0;
+    }
+    .pf-badge-ok   { background: var(--ok-soft); color: var(--ok-text); }
+    .pf-badge-warn { background: var(--warn-soft); color: var(--warn-text); }
+    .pf-badge-err  { background: var(--err-soft); color: var(--err-text); }
+    .pf-badge-active { background: var(--primary-soft); color: var(--primary); }
+    .pf-badge-info { background: var(--primary-soft); color: var(--primary); }
+
+    /* Table */
+    .pf-table-card {
+      background: var(--bg-raised); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+      box-shadow: var(--shadow-xs); margin-bottom: 24px;
+    }
+    .pf-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .pf-table th {
+      padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--text-muted); background: var(--bg-subtle);
+      border-bottom: 1px solid var(--border);
+    }
+    .pf-table td {
+      padding: 10px 14px; border-bottom: 1px solid var(--border-soft);
+      vertical-align: middle; color: var(--text);
+    }
+    .pf-table tr:last-child td { border-bottom: none; }
+    .pf-table tbody tr:hover td { background: var(--bg-muted); }
+    .pill-from { background: var(--err-soft); color: var(--err-text); padding: 2px 8px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 600; }
+    .pill-to   { background: var(--ok-soft);  color: var(--ok-text);  padding: 2px 8px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 600; }
+    .attempt-1 { color: var(--ok); font-weight: 600; }
+    .attempt-2 { color: var(--warn); font-weight: 600; }
+    .attempt-3 { color: var(--err); font-weight: 600; }
+    .pf-empty-state {
+      padding: 48px 24px; text-align: center; color: var(--text-muted); font-size: 14px;
+    }
+    .pf-empty-icon { font-size: 32px; margin-bottom: 10px; }
+    .pf-pagination {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; background: var(--bg-subtle);
+      border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted);
+    }
+    .pf-pagination button {
+      padding: 4px 12px; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); background: var(--bg-raised);
+      cursor: pointer; font-size: 12px; color: var(--text);
+      transition: background var(--ease-fast);
+    }
+    .pf-pagination button:hover:not(:disabled) { background: var(--bg-muted); }
+    .pf-pagination button:disabled { opacity: 0.4; cursor: default; }
+
+    /* Config card */
+    .pf-config-card {
+      background: var(--bg-raised); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 22px 24px;
+      box-shadow: var(--shadow-xs);
+    }
+    .pf-config-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 20px; }
+    .pf-field {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid var(--border-soft);
+    }
+    .pf-field:last-of-type { border-bottom: none; }
+    .pf-field-label { font-size: 13px; color: var(--text); font-weight: 500; }
+    .pf-field-hint  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .pf-field-right { display: flex; align-items: center; gap: 8px; }
+    .pf-input {
+      width: 80px; padding: 6px 10px; text-align: right;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 13px; color: var(--text); background: var(--bg-raised);
+      font-family: var(--mono); transition: border-color var(--ease-fast);
+    }
+    .pf-input:focus { outline: none; border-color: var(--border-focus); box-shadow: var(--shadow-focus); }
+    .pf-unit { font-size: 12px; color: var(--text-muted); min-width: 44px; }
+    .pf-config-footer {
+      display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 18px;
+    }
+    .pf-save-ok { font-size: 12px; color: var(--ok-text); display: none; }
+
+    /* Buttons */
+    .btn-pf-primary {
+      padding: 8px 16px; background: var(--primary); color: var(--primary-text);
+      border: none; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: background var(--ease-fast);
+    }
+    .btn-pf-primary:hover { background: var(--primary-hover); }
+    .btn-pf-primary:disabled { opacity: 0.5; cursor: default; }
+    .btn-pf-outline {
+      padding: 7px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--bg-raised); color: var(--text); font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: background var(--ease-fast), border-color var(--ease-fast);
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-pf-outline:hover { background: var(--bg-muted); border-color: var(--border-strong); }
+    .btn-pf-outline:disabled { opacity: 0.5; cursor: default; }
+
+    /* Topbar right section */
+    .pf-topbar-right { display: flex; align-items: center; gap: 10px; }
+    .conn-pill {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--text-secondary); font-weight: 500;
+      padding: 5px 10px; border-radius: var(--radius-pill);
+      background: var(--ok-soft); border: 1px solid var(--ok-soft-strong);
+    }
+
+    /* Monotext */
+    .mono { font-family: var(--mono); }
+  </style>
+  <script>
+    (function() {
+      try {
+        const savedTheme = localStorage.getItem('fcc_theme');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- ── Sidebar ──────────────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">FCC Gateway</div>
+          <div class="brand-sub">Universal Claude-Compatible AI Gateway</div>
+        </div>
+      </div>
+      <span class="version-badge" id="version-badge">v—</span>
+    </div>
+
+    <nav class="sidebar-nav" role="navigation">
+      <div class="nav-section-label">Main</div>
+      <a class="nav-item" href="/admin#overview">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span>Overview</span>
+      </a>
+      <a class="nav-item" href="/admin#requests">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Live Requests</span>
+      </a>
+      <a class="nav-item" href="/admin#playground">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span>Playground</span>
+      </a>
+
+      <div class="nav-section-label">Management</div>
+      <a class="nav-item" href="/admin#providers">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        <span>Providers</span>
+      </a>
+      <a class="nav-item" href="/admin#models">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        <span>Model Router</span>
+      </a>
+      <a class="nav-item active" href="/admin/provider-failover">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM17 14v6M14 17h6"/></svg>
+        <span>Provider Failover</span>
+      </a>
+
+      <div class="nav-section-label">System</div>
+      <a class="nav-item" href="/admin#context">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h10M7 12h6"/></svg>
+        <span>Auto-Compact</span>
+      </a>
+      <a class="nav-item" href="/admin#settings">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        <span>Settings</span>
+      </a>
+      <a class="nav-item" href="/admin#diagnostics">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <span>Diagnostics</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="status-indicator">
+        <span class="status-dot live"></span>
+        <span>Gateway Live</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ──────────────────────────────────────────────── -->
+  <div class="main-wrap">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title">Provider failover</h1>
+        <p class="page-subtitle">Monitor provider health and automatic failover activity.</p>
+      </div>
+      <div class="pf-topbar-right">
+        <!-- Theme Toggle -->
+        <button class="btn-pf-outline theme-toggle-btn" id="theme-toggle-btn" type="button" aria-label="Toggle dark mode" style="padding: 0 8px;">
+          <svg class="theme-icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="theme-icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:none;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </button>
+
+        <div class="pf-live-label">
+          <span class="pf-live-dot"></span>
+          <span id="last-updated">Loading…</span>
+        </div>
+        <button class="btn-pf-outline" id="btn-check-now">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Run health check
+        </button>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="page-content">
+
+      <!-- ── Section 1: Metric cards ──────────────────────────────── -->
+      <div class="pf-metric-grid stagger-item">
+
+        <!-- Auto-failover toggle -->
+        <div class="pf-metric-card">
+          <div class="pf-metric-label">Auto-failover</div>
+          <div class="pf-toggle-row">
+            <label class="pf-toggle">
+              <input type="checkbox" id="failover-toggle" />
+              <span class="pf-slider"></span>
+            </label>
+            <span id="failover-status-text" style="font-size:14px;font-weight:600;color:var(--text-muted)">—</span>
+          </div>
+          <div class="pf-metric-sub">Enable or disable provider switching</div>
+        </div>
+
+        <!-- Providers healthy -->
+        <div class="pf-metric-card">
+          <div class="pf-metric-label">Providers healthy</div>
+          <div class="pf-metric-value" id="metric-healthy">—</div>
+          <div class="pf-metric-sub">Of total configured providers</div>
+        </div>
+
+        <!-- Switches today -->
+        <div class="pf-metric-card">
+          <div class="pf-metric-label">Switches today</div>
+          <div class="pf-metric-value" id="metric-switches">—</div>
+          <div class="pf-metric-sub">Provider failover events in last 24 h</div>
+        </div>
+
+      </div>
+
+      <!-- ── Section 2: Provider health grid ─────────────────────── -->
+      <div class="pf-section-head stagger-item">
+        <div class="pf-section-title">Provider health</div>
+      </div>
+      <div class="pf-provider-grid stagger-item" id="provider-grid">
+        <div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--text-muted);font-size:14px;">
+          Loading providers…
+        </div>
+      </div>
+
+      <!-- ── Section 3: Switch log ────────────────────────────────── -->
+      <div class="pf-section-head stagger-item">
+        <div class="pf-section-title">Switch log</div>
+        <span id="switch-count" style="font-size:12px;color:var(--text-muted)"></span>
+      </div>
+      <div class="pf-table-card stagger-item">
+        <table class="pf-table" id="switch-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>From provider</th>
+              <th>From model</th>
+              <th>To provider</th>
+              <th>To model</th>
+              <th>Reason</th>
+              <th>Attempt</th>
+              <th>Duration</th>
+            </tr>
+          </thead>
+          <tbody id="switch-tbody"></tbody>
+        </table>
+        <div id="switch-empty" class="pf-empty-state" style="display:none">
+          <div class="pf-empty-icon">✓</div>
+          No provider switches recorded yet
+        </div>
+        <div class="pf-pagination" id="switch-pagination" style="display:none">
+          <span id="page-info" style="color:var(--text-muted)">—</span>
+          <div style="display:flex;gap:8px">
+            <button id="btn-prev" disabled>← Previous</button>
+            <button id="btn-next" disabled>Next →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Section 4: Config ────────────────────────────────────── -->
+      <div class="pf-config-card stagger-item">
+        <div class="pf-config-title">Failover configuration</div>
+
+        <div class="pf-field">
+          <div>
+            <div class="pf-field-label">Health check interval</div>
+            <div class="pf-field-hint">How often each provider is pinged in the background</div>
+          </div>
+          <div class="pf-field-right">
+            <input class="pf-input" type="number" id="cfg-interval" min="60" max="3600" value="300" />
+            <span class="pf-unit">seconds</span>
+          </div>
+        </div>
+
+        <div class="pf-field">
+          <div>
+            <div class="pf-field-label">Max retries per request</div>
+            <div class="pf-field-hint">Attempts on the same provider before switching</div>
+          </div>
+          <div class="pf-field-right">
+            <input class="pf-input" type="number" id="cfg-retries" min="1" max="10" value="3" />
+            <span class="pf-unit"></span>
+          </div>
+        </div>
+
+        <div class="pf-field">
+          <div>
+            <div class="pf-field-label">Delay after attempt 1</div>
+          </div>
+          <div class="pf-field-right">
+            <input class="pf-input" type="number" id="cfg-delay1" min="0" max="30000" value="2000" />
+            <span class="pf-unit">ms</span>
+          </div>
+        </div>
+
+        <div class="pf-field">
+          <div>
+            <div class="pf-field-label">Delay after attempt 2</div>
+          </div>
+          <div class="pf-field-right">
+            <input class="pf-input" type="number" id="cfg-delay2" min="0" max="60000" value="5000" />
+            <span class="pf-unit">ms</span>
+          </div>
+        </div>
+
+        <div class="pf-field">
+          <div>
+            <div class="pf-field-label">Alert on provider switch</div>
+            <div class="pf-field-hint">Log each failover event to the server console</div>
+          </div>
+          <div class="pf-field-right">
+            <label class="pf-toggle">
+              <input type="checkbox" id="cfg-alert" />
+              <span class="pf-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="pf-config-footer">
+          <span class="pf-save-ok" id="save-status">✓ Saved</span>
+          <button class="btn-pf-primary" id="btn-save">Save settings</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+  (() => {
+    'use strict';
+
+    const API = '/admin/api/failover';
+    let currentPage = 1;
+    let totalPages = 1;
+    let lastUpdatedAt = null;
+    let activeProviderId = null;
+
+    // ── Utilities ───────────────────────────────────────────────────
+    function esc(s) {
+      return String(s ?? '—').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function timeAgo(iso) {
+      if (!iso) return 'Not checked';
+      const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+      if (diff < 5) return 'Just now';
+      if (diff < 60) return diff + 's ago';
+      if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+      return Math.floor(diff/3600) + 'h ago';
+    }
+
+    function reasonLabel(r) {
+      const m = {
+        '429_rate_limit': 'Rate limited (429)',
+        '503_unavailable': 'Unavailable (503)',
+        '502_bad_gateway': 'Bad gateway (502)',
+        '504_timeout': 'Timeout (504)',
+        '500_server_error': 'Server error (500)',
+        '529_overloaded': 'Overloaded (529)',
+      };
+      return m[r] || r;
+    }
+
+    function attemptLabel(n) {
+      const cls = n === 1 ? 'attempt-1' : n === 2 ? 'attempt-2' : 'attempt-3';
+      const txt = n === 1 ? '1st' : n === 2 ? '2nd' : '3rd';
+      return `<span class="${cls}">${txt}</span>`;
+    }
+
+    function statusDotClass(s) {
+      if (s === 'HEALTHY') return 'pf-dot-ok';
+      if (s === 'RATE_LIMITED') return 'pf-dot-warn';
+      if (s === 'UNKNOWN') return 'pf-dot-warn';
+      return 'pf-dot-err';
+    }
+
+    function statusBadge(s) {
+      if (s === 'HEALTHY') return '<span class="pf-badge pf-badge-ok">Healthy</span>';
+      if (s === 'RATE_LIMITED') return '<span class="pf-badge pf-badge-warn">Rate limited</span>';
+      if (s === 'AUTH_ERROR') return '<span class="pf-badge pf-badge-err">Auth error</span>';
+      if (s === 'UNKNOWN') return '<span class="pf-badge pf-badge-info">Not checked</span>';
+      return '<span class="pf-badge pf-badge-err">Unreachable</span>';
+    }
+
+    // ── Load & render status ────────────────────────────────────────
+    async function loadStatus() {
+      try {
+        const [statusRes, provRes] = await Promise.all([
+          fetch(API + '/status', { credentials: 'same-origin' }),
+          fetch('/admin/api/providers', { credentials: 'same-origin' }),
+        ]);
+        if (!statusRes.ok) return;
+        const data = await statusRes.json();
+        if (provRes.ok) {
+          const pd = await provRes.json();
+          activeProviderId = pd.activeId;
+        }
+        renderStatus(data);
+        lastUpdatedAt = new Date();
+      } catch (e) { console.error('failover status load failed', e); }
+    }
+
+    function renderStatus(data) {
+      const { statuses = [], config = {}, summary = {} } = data;
+
+      // Toggle
+      const toggle = document.getElementById('failover-toggle');
+      toggle.checked = Boolean(config.failover_enabled);
+      const txt = document.getElementById('failover-status-text');
+      txt.textContent = config.failover_enabled ? 'Active' : 'Paused';
+      txt.style.color = config.failover_enabled ? 'var(--ok)' : 'var(--warn)';
+
+      // Metrics
+      document.getElementById('metric-healthy').textContent =
+        `${summary.healthyCount ?? 0} / ${summary.totalCount ?? 0}`;
+      document.getElementById('metric-switches').textContent =
+        String(summary.switchesToday ?? 0);
+
+      // Provider grid
+      const grid = document.getElementById('provider-grid');
+      if (!statuses.length) {
+        grid.innerHTML = `<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--text-muted);font-size:14px;">
+          No providers configured. Add providers in the <a href="/admin#providers" style="color:var(--primary)">Providers</a> section.
+        </div>`;
+      } else {
+        grid.innerHTML = statuses.map(s => {
+          const isActive = s.id === activeProviderId;
+          return `
+          <div class="pf-provider-card${isActive ? ' is-active' : ''}">
+            <div class="pf-card-head">
+              <div class="pf-card-name">
+                <span class="pf-dot ${statusDotClass(s.status)}"></span>
+                ${esc(s.provider)}
+              </div>
+              <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+                ${isActive ? '<span class="pf-badge pf-badge-active" style="font-size:10px">Active</span>' : ''}
+                ${statusBadge(s.status)}
+              </div>
+            </div>
+            <div class="pf-card-model">${esc(s.model)}</div>
+            <hr class="pf-card-divider" />
+            <div class="pf-stat-row">
+              <span class="pf-stat-label">Response time</span>
+              <span class="pf-stat-val">${s.responseMs != null ? s.responseMs + 'ms' : '—'}</span>
+            </div>
+            <div class="pf-stat-row">
+              <span class="pf-stat-label">Error count (1h)</span>
+              <span class="pf-stat-val">${s.errorCount ?? 0}</span>
+            </div>
+            <div class="pf-stat-row">
+              <span class="pf-stat-label">Last checked</span>
+              <span class="pf-stat-val">${timeAgo(s.lastChecked)}</span>
+            </div>
+            ${s.lastError ? `<div class="pf-stat-row">
+              <span class="pf-stat-label">Last error</span>
+              <span class="pf-stat-err">${esc(s.lastError)}</span>
+            </div>` : ''}
+          </div>`;
+        }).join('');
+      }
+
+      // Config form
+      if (config.health_check_interval != null) {
+        document.getElementById('cfg-interval').value = config.health_check_interval;
+        document.getElementById('cfg-retries').value = config.max_retries;
+        document.getElementById('cfg-delay1').value = config.retry_delay_1;
+        document.getElementById('cfg-delay2').value = config.retry_delay_2;
+        document.getElementById('cfg-alert').checked = Boolean(config.alert_on_switch);
+      }
+    }
+
+    // ── Load & render switch log ────────────────────────────────────
+    async function loadSwitches(page) {
+      try {
+        const res = await fetch(`${API}/switches?page=${page}`, { credentials: 'same-origin' });
+        if (!res.ok) return;
+        const data = await res.json();
+        currentPage = data.page;
+        totalPages = data.pages;
+        renderSwitches(data);
+      } catch (e) { console.error('switch log load failed', e); }
+    }
+
+    function renderSwitches(data) {
+      const tbody = document.getElementById('switch-tbody');
+      const empty = document.getElementById('switch-empty');
+      const pagination = document.getElementById('switch-pagination');
+      const countEl = document.getElementById('switch-count');
+
+      countEl.textContent = data.total ? `${data.total} total` : '';
+
+      if (!data.entries || !data.entries.length) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        pagination.style.display = 'none';
+        return;
+      }
+
+      empty.style.display = 'none';
+      pagination.style.display = 'flex';
+
+      tbody.innerHTML = data.entries.map(e => `
+        <tr>
+          <td style="white-space:nowrap;color:var(--text-secondary);font-size:12px">${new Date(e.createdAt).toLocaleString()}</td>
+          <td><span class="pill-from">${esc(e.fromProvider)}</span></td>
+          <td class="mono" style="font-size:11px;color:var(--text-muted)">${esc(e.fromModel)}</td>
+          <td><span class="pill-to">${esc(e.toProvider)}</span></td>
+          <td class="mono" style="font-size:11px;color:var(--text-muted)">${esc(e.toModel)}</td>
+          <td style="font-size:12px">${reasonLabel(e.reason)}</td>
+          <td>${attemptLabel(e.attemptNumber)}</td>
+          <td style="color:var(--text-muted);font-size:12px">${e.responseTimeMs != null ? e.responseTimeMs + 'ms' : '—'}</td>
+        </tr>`).join('');
+
+      document.getElementById('page-info').textContent =
+        `Page ${data.page} of ${data.pages} · ${data.total} entries`;
+      document.getElementById('btn-prev').disabled = data.page <= 1;
+      document.getElementById('btn-next').disabled = data.page >= data.pages;
+    }
+
+    // ── Live ticker ─────────────────────────────────────────────────
+    setInterval(() => {
+      const el = document.getElementById('last-updated');
+      if (lastUpdatedAt) {
+        const sec = Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000);
+        el.textContent = `Live · updated ${sec}s ago`;
+      }
+    }, 1000);
+
+    // ── Version badge ────────────────────────────────────────────────
+    fetch('/admin/api/operations', { credentials: 'same-origin' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.version) document.getElementById('version-badge').textContent = 'v' + d.version;
+      }).catch(() => {});
+
+    // ── Events ──────────────────────────────────────────────────────
+    document.getElementById('failover-toggle').addEventListener('change', async e => {
+      const enabled = e.target.checked;
+      const txt = document.getElementById('failover-status-text');
+      try {
+        await fetch(API + '/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ enabled }),
+        });
+        txt.textContent = enabled ? 'Active' : 'Paused';
+        txt.style.color = enabled ? 'var(--ok)' : 'var(--warn)';
+      } catch (err) { console.error('toggle failed', err); }
+    });
+
+    document.getElementById('btn-check-now').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-check-now');
+      btn.disabled = true;
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Checking…';
+      try {
+        await fetch(API + '/health-check', { method: 'POST', credentials: 'same-origin' });
+        await Promise.all([loadStatus(), loadSwitches(currentPage)]);
+      } catch (e) { console.error('health check failed', e); }
+      finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Run health check';
+      }
+    });
+
+    document.getElementById('btn-prev').addEventListener('click', () => {
+      if (currentPage > 1) loadSwitches(currentPage - 1);
+    });
+    document.getElementById('btn-next').addEventListener('click', () => {
+      if (currentPage < totalPages) loadSwitches(currentPage + 1);
+    });
+
+    document.getElementById('btn-save').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-save');
+      btn.disabled = true;
+      try {
+        const patch = {
+          health_check_interval: parseInt(document.getElementById('cfg-interval').value, 10),
+          max_retries:           parseInt(document.getElementById('cfg-retries').value, 10),
+          retry_delay_1:         parseInt(document.getElementById('cfg-delay1').value, 10),
+          retry_delay_2:         parseInt(document.getElementById('cfg-delay2').value, 10),
+          alert_on_switch:       document.getElementById('cfg-alert').checked,
+        };
+        const res = await fetch(API + '/config', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(patch),
+        });
+        if (res.ok) {
+          const saved = document.getElementById('save-status');
+          saved.style.display = 'inline';
+          setTimeout(() => { saved.style.display = 'none'; }, 3000);
+        }
+      } catch (e) { console.error('save config failed', e); }
+      finally { btn.disabled = false; }
+    });
+
+    // ── Spin animation for the refresh icon ─────────────────────────
+    const style = document.createElement('style');
+    style.textContent = '@keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }';
+    document.head.appendChild(style);
+
+    // ── Init + polling ───────────────────────────────────────────────
+    Promise.all([loadStatus(), loadSwitches(1)]);
+    setInterval(() => { loadStatus(); loadSwitches(currentPage); }, 30_000);
+  })();
+</script>
+<script>
+  /* ── Dark Mode Toggle ────────────────────────────────────────── */
+  (function initTheme() {
+    const toggleBtn = document.getElementById('theme-toggle-btn');
+    if (!toggleBtn) return;
+    
+    const savedTheme = localStorage.getItem('fcc_theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+    
+    toggleBtn.addEventListener('click', () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('fcc_theme', 'light');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('fcc_theme', 'dark');
+      }
+    });
+  })();
+</script>
+</body>
+</html>

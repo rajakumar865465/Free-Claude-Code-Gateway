@@ -72,13 +72,19 @@ export function convertOpenAIResponseToAnthropic(
 
   const usage = openai.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
 
+  const hasToolCalls = Boolean(toolCalls && toolCalls.length > 0);
+  let stopReason = mapFinishReason(choice?.finish_reason);
+  if (hasToolCalls && stopReason !== 'max_tokens') {
+    stopReason = 'tool_use';
+  }
+
   return {
     id: openai.id,
     type: 'message',
     role: 'assistant',
     model: openai.model || fallbackModel,
     content,
-    stop_reason: mapFinishReason(choice?.finish_reason),
+    stop_reason: stopReason,
     stop_sequence: null,
     usage: {
       input_tokens: usage.prompt_tokens ?? 0,

@@ -4,6 +4,28 @@ All notable changes to Free Claude Code Gateway are documented here.
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Databricks Provider Support** — Added Databricks as a first-class provider type with dedicated UI selector.
+  - New `type` field in provider configuration (values: `openai`, `databricks`)
+  - Provider type selector dropdown in Add/Edit Provider modal
+  - Dynamic placeholder text updates based on selected provider type
+  - Backward compatibility: existing providers default to `openai` type
+  - Comprehensive Databricks setup guide in `docs/DATABRICKS_SETUP.md`
+- Provider type validation in `ProviderManager.validateInput()`
+- Updated provider interfaces (`Provider`, `ProviderSnapshot`) to include optional `type` field
+
+### Changed
+- Provider modal form now includes API Provider selector before Base URL field
+- Base URL placeholder dynamically updates based on selected provider type
+
+### Documentation
+- Added `docs/DATABRICKS_SETUP.md` with detailed configuration instructions
+- Updated README with Databricks entry in supported providers table
+
+---
+
 ## [1.0.0] — 2026-06-08
 
 ### Added

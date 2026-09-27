@@ -339,6 +339,20 @@ export class ContextTracker {
       content: injectedContent,
     };
 
-    return [...systemMessages, injectionMsg, ...otherMessages];
+    // If otherMessages begins with 'tool' message(s), inserting a 'user' message
+    // before them violates the tool_calls -> tool response sequence invariant.
+    // Insert injectionMsg after any leading tool response chain.
+    let insertIdx = 0;
+    while (insertIdx < otherMessages.length && otherMessages[insertIdx].role === 'tool') {
+      insertIdx++;
+    }
+
+    const merged = [
+      ...otherMessages.slice(0, insertIdx),
+      injectionMsg,
+      ...otherMessages.slice(insertIdx),
+    ];
+
+    return [...systemMessages, ...merged];
   }
 }

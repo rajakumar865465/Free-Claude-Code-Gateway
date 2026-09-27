@@ -32,7 +32,7 @@ describe('anthropic-to-openai: content conversion', () => {
         source: { type: 'base64', media_type: 'image/png', data: 'abc' },
       },
     ]);
-    assert.equal(out, 'look:\n[Image input not supported by this proxy]');
+    assert.equal(out, 'look:\n[Image omitted]');
   });
 
   it('flattens tool_result blocks', () => {
@@ -89,7 +89,7 @@ describe('anthropic-to-openai: request validation', () => {
     assert.equal(out.ok, true);
   });
 
-  it('rejects image input with unsupported_feature', () => {
+  it('accepts image input and converts to OpenAI image_url', () => {
     const out = validateAndConvertAnthropicRequest({
       model: 'claude-3-5-sonnet-20241022',
       messages: [
@@ -105,9 +105,10 @@ describe('anthropic-to-openai: request validation', () => {
         },
       ],
     });
-    assert.equal(out.ok, false);
-    if (!out.ok) {
-      assert.equal(out.body.error.type, 'unsupported_feature');
+    assert.equal(out.ok, true);
+    if (out.ok) {
+      assert.equal(out.request.messages.length, 1);
+      assert.ok(Array.isArray(out.request.messages[0].content));
     }
   });
 

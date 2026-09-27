@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "test": "node --test --import tsx tests/config.test.ts tests/converter.test.ts tests/errors.test.ts tests/messages.test.ts tests/models.test.ts tests/redact.test.ts",
+    "test": "node --test --import tsx tests/config.test.ts tests/converter.test.ts tests/errors.test.ts tests/failover.test.ts tests/messages.test.ts tests/model-matcher.test.ts tests/models.test.ts tests/redact.test.ts tests/responses-mapper.test.ts tests/responses-stream.test.ts tests/streaming-resilience.test.ts tests/gateway-fixes.test.ts tests/gateway-keys.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "engines": {
@@ -35,6 +35,8 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1087.0",
+    "@aws-sdk/credential-providers": "^3.709.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

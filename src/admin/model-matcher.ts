@@ -178,3 +178,81 @@ export function buildSuggestions(
 
   return suggestions;
 }
+
+export type ClaudeTier = 'haiku' | 'opus' | 'sonnet' | 'unknown';
+
+export function getClaudeTier(claudeModel: string): ClaudeTier {
+  const lower = claudeModel.toLowerCase();
+  if (lower.includes('haiku')) return 'haiku';
+  if (lower.includes('opus')) return 'opus';
+  if (lower.includes('sonnet')) return 'sonnet';
+  return 'unknown';
+}
+
+const HAIKU_KEYWORDS = ['flash', 'mini', 'nano', 'lite', '8b', '7b', '3b', '1b', 'small', 'fast', 'haiku', 'turbo'];
+const OPUS_KEYWORDS = ['405b', 'pro', 'max', 'large', 'plus', 'opus', 'flagship'];
+const SONNET_KEYWORDS = ['sonnet', '70b', '32b', 'medium', 'balanced'];
+
+export function matchModelByTier(
+  claudeModel: string,
+  availableModels: string[],
+  fallback: string = '',
+): string {
+  if (availableModels.length === 0) return fallback;
+  if (availableModels.length === 1) return availableModels[0];
+
+  const tier = getClaudeTier(claudeModel);
+
+  // If Haiku tier: prefer models matching HAIKU_KEYWORDS
+  if (tier === 'haiku') {
+    for (const kw of HAIKU_KEYWORDS) {
+      const match = availableModels.find((m) => m.toLowerCase().includes(kw));
+      if (match) return match;
+    }
+  }
+
+  // If Opus tier: prefer models matching OPUS_KEYWORDS, or non-flash/non-mini models
+  if (tier === 'opus') {
+    for (const kw of OPUS_KEYWORDS) {
+      const match = availableModels.find((m) => m.toLowerCase().includes(kw));
+      if (match) return match;
+    }
+    const nonFlash = availableModels.find((m) => {
+      const lower = m.toLowerCase();
+      return !HAIKU_KEYWORDS.some((kw) => lower.includes(kw));
+    });
+    if (nonFlash) return nonFlash;
+  }
+
+  // If Sonnet tier: prefer models matching SONNET_KEYWORDS, or non-flash models
+  if (tier === 'sonnet') {
+    for (const kw of SONNET_KEYWORDS) {
+      const match = availableModels.find((m) => m.toLowerCase().includes(kw));
+      if (match) return match;
+    }
+    const nonFlash = availableModels.find((m) => {
+      const lower = m.toLowerCase();
+      return !HAIKU_KEYWORDS.some((kw) => lower.includes(kw));
+    });
+    if (nonFlash) return nonFlash;
+  }
+
+  if (fallback && availableModels.includes(fallback)) {
+    return fallback;
+  }
+  // Last resort: return first model, but prefer the fallback even if it's not in the list
+  // to avoid assigning non-chat models (e.g. code, vision, embedding models)
+  return fallback || availableModels[0];
+}
+
+export function distributeModelsByTier(
+  claudeModels: string[],
+  availableModels: string[],
+  fallback: string = '',
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const m of claudeModels) {
+    result[m] = matchModelByTier(m, availableModels, fallback);
+  }
+  return result;
+}

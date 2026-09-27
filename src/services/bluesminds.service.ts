@@ -51,18 +51,20 @@ export class BluesmindsService {
   private readonly _baseUrl?: string;
   private readonly _apiKey?: string;
   private readonly _timeoutMs?: number;
+  private readonly _urlSuffix?: string;
 
   constructor(
-    opts?: { baseUrl?: string; apiKey?: string; timeoutMs?: number } | { configManager: ConfigManager },
+    opts?: { baseUrl?: string; apiKey?: string; timeoutMs?: number; urlSuffix?: string } | { configManager: ConfigManager },
   ) {
     if (opts && 'configManager' in opts) {
       this.configManager = opts.configManager;
       return;
     }
-    const cfg = (opts ?? {}) as { baseUrl?: string; apiKey?: string; timeoutMs?: number };
+    const cfg = (opts ?? {}) as { baseUrl?: string; apiKey?: string; timeoutMs?: number; urlSuffix?: string };
     this._baseUrl = cfg.baseUrl ? cfg.baseUrl.replace(/\/+$/, '') : undefined;
     this._apiKey = cfg.apiKey;
     this._timeoutMs = cfg.timeoutMs;
+    this._urlSuffix = cfg.urlSuffix;
   }
 
   private get baseUrl(): string {
@@ -86,7 +88,11 @@ export class BluesmindsService {
   }
 
   private get authHeader(): Record<string, string> {
-    return { Authorization: `Bearer ${this.apiKey}` };
+    if (!this.apiKey) return {};
+    return { 
+      Authorization: `Bearer ${this.apiKey}`,
+      'api-key': this.apiKey,
+    };
   }
 
   private async requestOnce<T>(
@@ -95,7 +101,8 @@ export class BluesmindsService {
     body?: unknown,
     overrideTimeoutMs?: number,
   ): Promise<ProviderResponse<T>> {
-    const url = `${this.baseUrl}${path}`;
+    // Append urlSuffix (e.g. ?api-version=...) if provided
+    const url = `${this.baseUrl}${path}${this._urlSuffix ?? ''}`;
     const controller = new AbortControllerWithTimeout(overrideTimeoutMs ?? this.timeoutMs);
     const start = Date.now();
     try {
@@ -244,6 +251,36 @@ export class BluesmindsService {
     return result;
   }
 
+  async createResponsesCompletion(
+    body: any,
+  ): Promise<ProviderResponse<any | OpenAIErrorResponse>> {
+    // The path here will usually be `/responses` or `/openai/v1/responses` depending on the provider setup.
+    // For Azure it's handled by baseUrl or urlSuffix if needed.
+    // By default, OpenAI endpoint for responses is /v1/responses, but the proxy baseUrl already contains /v1.
+    // So we just use '/responses'
+    return this.requestOnce<any>('POST', '/responses', body);
+  }
+
+  async createResponsesCompletionStream(
+    body: any,
+    externalSignal?: AbortSignal,
+  ): Promise<
+    | { ok: true; response: globalThis.Response; status: number }
+    | { ok: false; status: number; body: unknown; retryAfterMs?: number }
+  > {
+    return this.streamPostOnce('/responses', body, externalSignal);
+  }
+
+  async createChatCompletionStreamOnce(
+    body: OpenAIChatCompletionsRequest,
+    externalSignal?: AbortSignal,
+  ): Promise<
+    | { ok: true; response: globalThis.Response; status: number }
+    | { ok: false; status: number; body: unknown; retryAfterMs?: number }
+  > {
+    return this.streamOnce(body, externalSignal);
+  }
+
   async createChatCompletionStream(
     body: OpenAIChatCompletionsRequest,
     backupModel?: string | null,
@@ -304,7 +341,15 @@ export class BluesmindsService {
     body: OpenAIChatCompletionsRequest,
     externalSignal?: AbortSignal,
   ): Promise<{ ok: true; response: globalThis.Response; status: number } | { ok: false; status: number; body: unknown; retryAfterMs?: number }> {
-    const url = `${this.baseUrl}/chat/completions`;
+    return this.streamPostOnce('/chat/completions', body, externalSignal);
+  }
+
+  private async streamPostOnce(
+    path: string,
+    body: unknown,
+    externalSignal?: AbortSignal,
+  ): Promise<{ ok: true; response: globalThis.Response; status: number } | { ok: false; status: number; body: unknown; retryAfterMs?: number }> {
+    const url = `${this.baseUrl}${path}${this._urlSuffix ?? ''}`;
 
     // Connect timeout: configurable via STREAM_CONNECT_TIMEOUT_MS (default 12s).
     // Must be below the provider's own 15s stall ceiling.
@@ -329,7 +374,7 @@ export class BluesmindsService {
           Accept: 'text/event-stream',
           ...this.authHeader,
         },
-        body: JSON.stringify({ ...body, stream: true }),
+        body: JSON.stringify({ ...(body as Record<string, unknown>), stream: true }),
         signal,
       });
 

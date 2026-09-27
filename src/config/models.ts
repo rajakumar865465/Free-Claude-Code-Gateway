@@ -7,6 +7,8 @@ import type { FamilyRule, ModelMappingConfig, ResolvedModel } from '../types/con
 // ---------------------------------------------------------------------------
 
 export const DEFAULT_FAMILY_RULES: FamilyRule[] = [
+  { name: 'Fable',        pattern: 'claude*fable*',  primary: 'z-ai/glm-5.1', backup: 'z-ai/glm-5.1' },
+  { name: 'Mythos',       pattern: 'claude*mythos*', primary: 'z-ai/glm-5.1', backup: 'z-ai/glm-5.1' },
   { name: 'Haiku',        pattern: 'claude*haiku*',  primary: 'z-ai/glm-5.1', backup: 'z-ai/glm-5.1' },
   { name: 'Sonnet',       pattern: 'claude*sonnet*', primary: 'z-ai/glm-5.1', backup: 'z-ai/glm-5.1' },
   { name: 'Opus',         pattern: 'claude*opus*',   primary: 'z-ai/glm-5.1', backup: 'z-ai/glm-5.1' },
@@ -16,13 +18,16 @@ export const DEFAULT_FAMILY_RULES: FamilyRule[] = [
 
 const DEFAULT_CONFIG: ModelMappingConfig = {
   anthropic_to_bluesminds: {
-    'claude-opus-4-5-20251101': 'z-ai/glm-5.1',
-    'claude-3-5-sonnet-latest':   'z-ai/glm-5.1',
-    'claude-3-7-sonnet-20250219': 'z-ai/glm-5.1',
-    'claude-sonnet-4-20250514':   'z-ai/glm-5.1',
-    'claude-opus-4-20250514':     'z-ai/glm-5.1',
-    'claude-haiku-4-20250514':    'z-ai/glm-5.1',
-    'claude-3-haiku-20240307':    'z-ai/glm-5.1',
+    'claude-opus-5-5':            'z-ai/glm-5.1',
+    'claude-sonnet-5':            'z-ai/glm-5.1',
+    'claude-fable-5-1':           'z-ai/glm-5.1',
+    'claude-mythos-5-1':          'z-ai/glm-5.1',
+    'claude-fable-5':             'z-ai/glm-5.1',
+    'claude-mythos-5':            'z-ai/glm-5.1',
+    'claude-opus-4-8':            'z-ai/glm-5.1',
+    'claude-opus-4-7':            'z-ai/glm-5.1',
+    'claude-sonnet-4-6':          'z-ai/glm-5.1',
+    'claude-opus-4-6':            'z-ai/glm-5.1',
   },
   default: 'z-ai/glm-5.1',
   family_rules: DEFAULT_FAMILY_RULES,

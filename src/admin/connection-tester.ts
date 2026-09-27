@@ -60,7 +60,7 @@ export class ConnectionTester {
         body: JSON.stringify({
           model: defaultModel,
           messages: [{ role: 'user', content: 'Hello' }],
-          max_tokens: 16,
+          max_completion_tokens: 16,
         }),
         signal: controller.signal,
       });

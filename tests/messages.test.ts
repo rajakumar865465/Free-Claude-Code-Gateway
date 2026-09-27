@@ -81,4 +81,44 @@ describe('openai-to-anthropic: response conversion', () => {
       assert.equal(out.content[0].text, '');
     }
   });
+
+  it('maps stop_reason to tool_use when tool_calls exist even if finish_reason was stop', () => {
+    const openai: OpenAIChatCompletionsResponse = {
+      id: 'chatcmpl_tool_1',
+      object: 'chat.completion',
+      created: 1_700_000_000,
+      model: 'gpt-4.1',
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: 'assistant',
+            content: 'I will write the file.',
+            tool_calls: [
+              {
+                id: 'call_123',
+                type: 'function',
+                function: {
+                  name: 'write_file',
+                  arguments: '{"path":"main.js"}',
+                },
+              },
+            ],
+          },
+          finish_reason: 'stop',
+        },
+      ],
+      usage: { prompt_tokens: 10, completion_tokens: 15, total_tokens: 25 },
+    };
+    const out = convertOpenAIResponseToAnthropic(openai, 'fallback');
+    assert.equal(out.stop_reason, 'tool_use');
+    assert.equal(out.content.length, 2);
+    assert.equal(out.content[0].type, 'text');
+    assert.equal(out.content[1].type, 'tool_use');
+    if (out.content[1].type === 'tool_use') {
+      assert.equal(out.content[1].id, 'call_123');
+      assert.equal(out.content[1].name, 'write_file');
+      assert.deepEqual(out.content[1].input, { path: 'main.js' });
+    }
+  });
 });

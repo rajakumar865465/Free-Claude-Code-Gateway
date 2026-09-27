@@ -13,7 +13,30 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/admin/assets/dashboard.css" />
+  <link rel="stylesheet" href="/admin/assets/dashboard.css?v=1.0.1" />
+  <style>
+    .nav-ext {
+      display: flex; align-items: center; gap: 11px;
+      padding: 9px 12px; border-radius: var(--radius-sm);
+      color: var(--text-secondary); font-weight: 500; font-size: 13px;
+      text-decoration: none; cursor: pointer; user-select: none;
+      position: relative; margin-bottom: 2px;
+      transition: background var(--ease-fast), color var(--ease-fast);
+    }
+    .nav-ext:hover { background: var(--bg-muted); color: var(--text); }
+    .nav-ext .nav-icon { width: 18px; height: 18px; flex-shrink: 0; }
+  </style>
+  <script>
+    (function() {
+      try {
+        const savedTheme = localStorage.getItem('fcc_theme');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <div class="app-layout">
@@ -56,6 +79,14 @@
         <a class="nav-item" data-view="models" href="#models">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
           <span>Model Router</span>
+        </a>
+        <a class="nav-ext" href="/admin/provider-failover">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM17 14v6M14 17h6"/></svg>
+          <span>Provider Failover</span>
+        </a>
+        <a class="nav-item" data-view="apikeys" href="#apikeys">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          <span>API Keys &amp; Setup</span>
         </a>
 
         <div class="nav-section-label">System</div>
@@ -104,6 +135,12 @@
           </div>
 
           <span class="env-badge" id="env-badge" title="Current environment">local</span>
+
+          <!-- Theme Toggle -->
+          <button class="btn btn-outline btn-sm theme-toggle-btn" id="theme-toggle-btn" type="button" aria-label="Toggle dark mode" style="padding: 0 8px;">
+            <svg class="theme-icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg class="theme-icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:none;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+          </button>
 
           <!-- Active Provider Switcher Dropdown -->
           <div class="provider-switcher" id="provider-switcher" style="display:none">
@@ -711,10 +748,68 @@
                     <span class="form-hint">Display name — for your reference only.</span>
                   </label>
                   <label class="form-field">
-                    <span class="form-label">Base URL <span class="form-required">*</span></span>
-                    <input id="pf-baseurl" type="url" placeholder="https://api.moonshot.cn/v1" autocomplete="off" />
-                    <span class="form-hint">Must include <code>/v1</code> path if required by the provider.</span>
+                    <span class="form-label">API Provider <span class="form-required">*</span></span>
+                    <select id="pf-type" class="form-select">
+                      <option value="openai-compatible">OpenAI Compatible</option>
+                      <option value="openai">OpenAI</option>
+                      <option value="anthropic">Anthropic</option>
+                      <option value="google-gemini">Google Gemini</option>
+                      <option value="groq">Groq</option>
+                      <option value="openrouter">OpenRouter</option>
+                      <option value="databricks">Databricks</option>
+                      <option value="aws_bedrock">AWS Bedrock</option>
+                      <option value="azure_foundry">Azure AI Foundry</option>
+                    </select>
+                    <span class="form-hint">Select the provider type for proper API formatting.</span>
                   </label>
+                  <label class="form-field" id="pf-baseurl-field" style="display:none">
+                    <span class="form-label">Base URL <span class="form-required">*</span></span>
+                    <input id="pf-baseurl" type="url" placeholder="https://api.example.com/v1" autocomplete="off" />
+                    <span class="form-hint">OpenAI-compatible endpoint. Must include <code>/v1</code> path if required.</span>
+                    <span class="form-error" id="pf-baseurl-error" style="display:none;color:var(--err);font-size:11px;margin-top:4px;"></span>
+                  </label>
+                  
+                  <!-- AWS Bedrock Fields -->
+                  <div id="pf-aws-bedrock-fields" style="display:none">
+                    <label class="form-field">
+                      <span class="form-label">AWS Region <span class="form-required">*</span></span>
+                      <select id="pf-aws-region" class="form-select">
+                        <option value="">Select a region...</option>
+                        <option value="us-east-1">US East (N. Virginia) - us-east-1</option>
+                        <option value="us-west-2">US West (Oregon) - us-west-2</option>
+                        <option value="eu-west-1">Europe (Ireland) - eu-west-1</option>
+                        <option value="eu-central-1">Europe (Frankfurt) - eu-central-1</option>
+                        <option value="ap-southeast-1">Asia Pacific (Singapore) - ap-southeast-1</option>
+                        <option value="ap-southeast-2">Asia Pacific (Sydney) - ap-southeast-2</option>
+                        <option value="ap-northeast-1">Asia Pacific (Tokyo) - ap-northeast-1</option>
+                        <option value="ap-south-1">Asia Pacific (Mumbai) - ap-south-1</option>
+                      </select>
+                      <span class="form-hint">AWS region where your Bedrock models are enabled</span>
+                    </label>
+                  </div>
+
+                  <!-- Azure AI Foundry Fields -->
+                  <div id="pf-azure-foundry-fields" style="display:none">
+                    <label class="form-field">
+                      <span class="form-label">Endpoint URL <span class="form-required">*</span></span>
+                      <input id="pf-azure-endpoint" type="url" placeholder="https://my-resource.services.ai.azure.com" autocomplete="off" />
+                      <span class="form-hint">Your Azure AI resource base URL — just the domain, e.g. <code>https://my-resource.services.ai.azure.com</code>. Any <code>/models</code> or <code>/openai</code> path will be added automatically.</span>
+                    </label>
+                    <label class="form-field">
+                      <span class="form-label">API Version</span>
+                      <input id="pf-azure-api-version" type="text" placeholder="2024-05-01-preview" value="2024-05-01-preview" autocomplete="off" />
+                      <span class="form-hint">Azure API version. Default: <code>2024-05-01-preview</code></span>
+                    </label>
+                    <label class="form-field">
+                      <span class="form-label">API Flavor</span>
+                      <select id="pf-azure-api-flavor" class="form-select">
+                        <option value="chat_completions">Chat Completions API (Standard)</option>
+                        <option value="responses">Responses API (Agentic / New)</option>
+                      </select>
+                      <span class="form-hint">Choose which API schema to use when connecting to Azure.</span>
+                    </label>
+                  </div>
+
                   <label class="form-field">
                     <span class="form-label">API Key</span>
                     <div class="input-with-icon">
@@ -735,6 +830,17 @@
                       <div class="model-combo-dropdown hidden" id="pf-model-dropdown"></div>
                     </div>
                     <span class="form-hint" id="pf-model-hint">Used for connection tests and as the fallback model.</span>
+                  </label>
+                  <label class="form-field form-field-full">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                      <span class="form-label" style="margin-bottom:0">Provider Models</span>
+                      <button type="button" id="pf-fetch-models-btn" class="btn btn-ghost btn-xs" style="color:var(--primary);font-weight:600;display:inline-flex;align-items:center;gap:4px" title="Fetch all available models directly from this provider">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                        ⚡ Fetch Models
+                      </button>
+                    </div>
+                    <textarea id="pf-available-models" rows="3" placeholder="e.g. moonshotai/kimi-k3, z-ai/glm-5.3-flash, 01-ai/yi-large" autocomplete="off" style="font-family:var(--font-mono);font-size:12px;line-height:1.4;resize:vertical"></textarea>
+                    <span class="form-hint" id="pf-models-count-hint">Comma-separated models supported by this provider. Click "Fetch Models" to pull all upstream models into this provider.</span>
                   </label>
                   <label class="form-field form-field-full">
                     <span class="form-label">Notes</span>
@@ -784,6 +890,10 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                 Auto-Map
               </button>
+              <button id="smart-tier-match-btn" class="btn btn-outline" type="button" disabled title="Sync Models first to enable Smart Tier Match">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>
+                Smart Match Tiers
+              </button>
               <button id="export-mappings" class="btn btn-outline" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export
@@ -800,10 +910,16 @@
               </h2>
               <span class="badge badge-success" id="default-model-status">Active</span>
             </div>
-            <div class="form-grid" style="max-width:480px">
+            <div class="form-grid" style="max-width:520px">
               <label>
                 <span>Provider Model</span>
-                <input id="default-model-input" class="mapping-input" type="text" list="provider-models-list" placeholder="e.g. moonshotai/kimi-k2.6" />
+                <div class="input-with-button" style="display:flex;gap:8px;align-items:center;">
+                  <input id="default-model-input" class="mapping-input" type="text" list="provider-models-list" placeholder="e.g. moonshotai/kimi-k2.6" />
+                  <button id="default-model-picker-btn" class="btn btn-secondary btn-sm model-picker-btn" type="button" title="Switch / Select from fetched provider models">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon-xs"><path d="m6 9 6 6 6-6"/></svg>
+                    <span>Switch</span>
+                  </button>
+                </div>
                 <small class="help-text">Used when no specific mapping matches the incoming Claude model name.</small>
               </label>
             </div>
@@ -1549,6 +1665,200 @@
           </div>
         </section>
 
+        <!-- ═══════════════════════ API KEYS & SETUP ═══════════════════ -->
+        <section class="view" data-view="apikeys" hidden>
+          <!-- Hero Banner -->
+          <div class="panel stagger-item" style="background: linear-gradient(135deg, rgba(37,99,235,0.06) 0%, rgba(124,58,237,0.06) 100%); border-color: rgba(37,99,235,0.2); margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                  <span class="badge badge-primary">Universal Gateway</span>
+                  <span class="badge badge-success" id="apikeys-status-badge">Gateway Online</span>
+                </div>
+                <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 6px 0;">Claude Desktop, Codex &amp; OpenAI Integration</h2>
+                <p style="color: var(--text-secondary); font-size: 13.5px; margin: 0; max-width: 680px;">
+                  Connect Claude Desktop, Claude Code CLI, Codex, Cursor, or any OpenAI-compatible client. Generate gateway API keys and use your unified base URLs below.
+                </p>
+              </div>
+              <button class="btn btn-primary" id="btn-open-create-key" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Create Gateway API Key</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- New Key Revealed Alert (Hidden by default) -->
+          <div id="new-key-banner" class="panel hidden" style="border: 1px solid var(--ok); background: var(--ok-soft); margin-bottom: 24px;">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;">
+              <div style="flex: 1;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--ok-text); margin-bottom: 6px;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>New Gateway API Key Generated!</span>
+                </div>
+                <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0 0 10px 0;">
+                  Copy this key now. For your security, you will <strong>not</strong> be able to see the full key again.
+                </p>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="text" id="new-key-value" readonly style="font-family: var(--font-mono, monospace); font-size: 13px; font-weight: 600; padding: 9px 12px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius-sm); flex: 1; max-width: 520px;" />
+                  <button class="btn btn-primary btn-sm" id="btn-copy-new-key" type="button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    <span>Copy Key</span>
+                  </button>
+                </div>
+              </div>
+              <button class="btn btn-icon-only" id="btn-dismiss-new-key" aria-label="Dismiss">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Integration Guides Grid -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 20px; margin-bottom: 24px;">
+
+            <!-- Claude Desktop Card (matches user screenshot) -->
+            <div class="panel stagger-item" style="border-top: 3px solid #7C3AED;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--accent-soft); display: flex; align-items: center; justify-content: center; color: var(--accent-text); font-weight: 800; font-size: 14px;">CD</div>
+                  <div>
+                    <h3 style="font-size: 15px; font-weight: 700; margin: 0;">Claude Desktop</h3>
+                    <div style="font-size: 11.5px; color: var(--text-muted);">Settings &gt; Connection &gt; Gateway</div>
+                  </div>
+                </div>
+                <span class="badge badge-accent">Direct Gateway Mode</span>
+              </div>
+
+              <!-- Visual field replica matching screenshot -->
+              <div style="display: flex; flex-direction: column; gap: 12px; background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-soft);">
+                <div>
+                  <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px;">Connection</label>
+                  <div style="font-size: 13px; font-weight: 600; color: var(--text);">🌐 Gateway</div>
+                </div>
+                <div>
+                  <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px;">Credential kind</label>
+                  <div style="font-size: 13px; color: var(--text);">Static API key</div>
+                </div>
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Gateway base URL *</label>
+                    <button class="btn btn-sm btn-outline" id="btn-copy-cd-url" style="padding: 2px 8px; font-size: 11px;">Copy</button>
+                  </div>
+                  <input type="text" id="cd-base-url" readonly style="width: 100%; font-family: monospace; font-size: 12px; padding: 7px 10px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius-sm);" value="http://localhost:8787" />
+                </div>
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Gateway API key *</label>
+                    <button class="btn btn-sm btn-outline" id="btn-copy-cd-key" style="padding: 2px 8px; font-size: 11px;">Copy</button>
+                  </div>
+                  <input type="text" id="cd-api-key" readonly style="width: 100%; font-family: monospace; font-size: 12px; padding: 7px 10px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius-sm);" placeholder="Generate key below..." />
+                </div>
+                <div>
+                  <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px;">Gateway auth scheme</label>
+                  <div style="font-size: 13px; color: var(--text);"><code style="padding: 2px 6px; background: var(--bg-muted); border-radius: 4px;">bearer</code> (or <code style="padding: 2px 6px; background: var(--bg-muted); border-radius: 4px;">x-api-key</code>)</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Codex / OpenAI SDK / Cursor Card -->
+            <div class="panel stagger-item" style="border-top: 3px solid #10B981;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--ok-soft); display: flex; align-items: center; justify-content: center; color: var(--ok-text); font-weight: 800; font-size: 14px;">OA</div>
+                  <div>
+                    <h3 style="font-size: 15px; font-weight: 700; margin: 0;">Codex &amp; OpenAI Tools</h3>
+                    <div style="font-size: 11.5px; color: var(--text-muted);">Cursor, Continue, Cline, OpenAI SDK</div>
+                  </div>
+                </div>
+                <span class="badge badge-success">OpenAI Compatible</span>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">OpenAI Base URL</label>
+                    <button class="btn btn-sm btn-outline" id="btn-copy-openai-url" style="padding: 2px 8px; font-size: 11px;">Copy</button>
+                  </div>
+                  <input type="text" id="openai-base-url" readonly style="width: 100%; font-family: monospace; font-size: 12px; padding: 7px 10px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius-sm);" value="http://localhost:8787/v1" />
+                </div>
+                <div>
+                  <div style="display: flex; gap: 6px; margin-bottom: 6px;" id="code-snippet-tabs">
+                    <button class="btn btn-sm btn-primary" data-snippet="python" style="padding: 3px 10px; font-size: 11px;">Python</button>
+                    <button class="btn btn-sm btn-outline" data-snippet="node" style="padding: 3px 10px; font-size: 11px;">Node.js</button>
+                    <button class="btn btn-sm btn-outline" data-snippet="curl" style="padding: 3px 10px; font-size: 11px;">cURL</button>
+                  </div>
+                  <div style="position: relative;">
+                    <pre id="openai-code-pre" style="margin:0; padding:12px; background:var(--bg-subtle); border:1px solid var(--border-soft); border-radius:var(--radius-sm); font-size:11.5px; white-space:pre-wrap; word-break:break-all; max-height:160px; overflow-y:auto;"></pre>
+                    <button class="btn btn-sm btn-outline" id="btn-copy-snippet" style="position: absolute; top: 8px; right: 8px; padding: 2px 8px; font-size: 11px;">Copy</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Claude Code CLI Card -->
+            <div class="panel stagger-item" style="border-top: 3px solid #2563EB;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--primary-soft); display: flex; align-items: center; justify-content: center; color: var(--primary); font-weight: 800; font-size: 14px;">CC</div>
+                  <div>
+                    <h3 style="font-size: 15px; font-weight: 700; margin: 0;">Claude Code CLI</h3>
+                    <div style="font-size: 11.5px; color: var(--text-muted);">Terminal coding assistant</div>
+                  </div>
+                </div>
+                <span class="badge badge-primary">Anthropic CLI</span>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0;">
+                  Set environment variables before starting Claude Code to route all requests through your gateway:
+                </p>
+                <div style="position: relative;">
+                  <pre id="claude-code-cli-pre" style="margin:0; padding:12px; background:var(--bg-subtle); border:1px solid var(--border-soft); border-radius:var(--radius-sm); font-size:11.5px; white-space:pre-wrap; word-break:break-all;">export ANTHROPIC_BASE_URL="http://localhost:8787"&#10;export ANTHROPIC_API_KEY="sk-gw-..."&#10;claude</pre>
+                  <button class="btn btn-sm btn-outline" id="btn-copy-cli-command" style="position: absolute; top: 8px; right: 8px; padding: 2px 8px; font-size: 11px;">Copy</button>
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted);">
+                  💡 Automatically routes to your active upstream model (e.g. Sonnet, Haiku, Bedrock, or OpenAI).
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Keys Management Table -->
+          <div class="panel stagger-item">
+            <div class="panel-head" style="margin-bottom: 16px;">
+              <div>
+                <h3 style="font-size: 16px; font-weight: 700; margin: 0 0 4px 0;">Generated Gateway API Keys</h3>
+                <div style="font-size: 12.5px; color: var(--text-secondary);">Manage authorization keys for your local clients and integrations.</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="gateway-keys-count-badge" class="badge badge-neutral">0 Keys</span>
+                <button class="btn btn-primary btn-sm" id="btn-create-key-table" type="button">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  New Key
+                </button>
+              </div>
+            </div>
+
+            <div class="table-wrap scrollable">
+              <table class="data-table" id="gateway-keys-table">
+                <thead>
+                  <tr>
+                    <th>Name / Client</th>
+                    <th>Key Prefix</th>
+                    <th>Created</th>
+                    <th>Last Used</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="gateway-keys-tbody">
+                  <tr><td colspan="6" class="empty-row">Loading gateway keys…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
       </main>
     </div>
   </div>
@@ -1658,6 +1968,43 @@
     </div>
   </div>
 
+  <!-- Create Gateway Key Modal -->
+  <div class="cmd-overlay hidden" id="create-key-modal-overlay">
+    <div class="cmd-panel" style="max-width: 460px;">
+      <div class="panel-head" style="padding: 18px 22px; border-bottom: 1px solid var(--border);">
+        <h2>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="panel-icon" style="display:inline-block; vertical-align:-3px; margin-right:8px; width:18px; height:18px; color:var(--primary);"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          Create Gateway API Key
+        </h2>
+        <button class="btn btn-icon-only" id="create-key-modal-close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="create-key-form" style="padding: 22px;">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text);">Key Label / Client Name</label>
+          <input type="text" id="new-key-name-input" placeholder="e.g. Claude Desktop, Codex, Laptop" required style="width: 100%; padding: 9px 12px; font-size: 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-raised);" />
+        </div>
+        <div style="margin-bottom: 22px;">
+          <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text);">Expiration</label>
+          <select id="new-key-expiry-select" style="width: 100%; padding: 9px 12px; font-size: 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-raised);">
+            <option value="0">Never expires (Recommended)</option>
+            <option value="30">30 days</option>
+            <option value="90">90 days</option>
+            <option value="365">1 year</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" class="btn btn-outline" id="create-key-modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="create-key-modal-submit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Generate Key
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Restart Confirmation Modal -->
   <div class="cmd-overlay hidden" id="restart-modal-overlay">
     <div class="cmd-panel" style="max-width:440px">
@@ -1697,6 +2044,6 @@
   </div>
 
   <datalist id="provider-models-list"></datalist>
-  <script src="/admin/assets/dashboard.js" defer></script>
+  <script src="/admin/assets/dashboard.js?v=1.0.1" defer></script>
 </body>
 </html>

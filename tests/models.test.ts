@@ -86,7 +86,7 @@ describe('resolveProviderModelWithBackup', () => {
   });
 
   it('family rule with backup returns the backup model', () => {
-    const r = resolveProviderModelWithBackup('claude-3-5-sonnet-latest', cfg, 'glm-4.6', false);
+    const r = resolveProviderModelWithBackup('claude-sonnet-5', cfg, 'glm-4.6', false);
     assert.equal(r.primary, 'glm-4.6');
     assert.equal(r.backup, 'kimi-k2.5');
   });

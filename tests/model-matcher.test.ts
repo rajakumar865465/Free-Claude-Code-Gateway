@@ -5,6 +5,9 @@ import {
   scoreMatch,
   computePrefixStyle,
   buildSuggestions,
+  getClaudeTier,
+  matchModelByTier,
+  distributeModelsByTier,
 } from '../src/admin/model-matcher';
 
 describe('normalizeModelId', () => {
@@ -133,5 +136,57 @@ describe('buildSuggestions', () => {
     // Both should suggest zhipu/glm-4.6
     assert.ok(sug.length >= 1);
     sug.forEach((s) => assert.equal(s.suggested, 'zhipu/glm-4.6'));
+  });
+});
+
+describe('Tier Matching & Distribution', () => {
+  it('identifies Claude model tier correctly', () => {
+    assert.equal(getClaudeTier('claude-3-5-sonnet-20241022'), 'sonnet');
+    assert.equal(getClaudeTier('claude-3-7-sonnet'), 'sonnet');
+    assert.equal(getClaudeTier('claude-3-opus-20240229'), 'opus');
+    assert.equal(getClaudeTier('claude-opus-4-5-20251101'), 'opus');
+    assert.equal(getClaudeTier('claude-3-haiku-20240307'), 'haiku');
+    assert.equal(getClaudeTier('claude-haiku-4-5-20251001'), 'haiku');
+    assert.equal(getClaudeTier('some-other-model'), 'unknown');
+  });
+
+  it('matches models by tier for glm provider (standard vs flash)', () => {
+    const models = ['z-ai/glm-5.3', 'z-ai/glm-5.3-flash'];
+    assert.equal(matchModelByTier('claude-3-haiku-20240307', models), 'z-ai/glm-5.3-flash');
+    assert.equal(matchModelByTier('claude-3-5-sonnet-20241022', models), 'z-ai/glm-5.3');
+    assert.equal(matchModelByTier('claude-3-opus-20240229', models), 'z-ai/glm-5.3');
+  });
+
+  it('matches models by tier for llama provider (405b vs 70b vs 8b)', () => {
+    const models = [
+      'meta/llama-3.1-405b-instruct',
+      'meta/llama-3.1-70b-instruct',
+      'meta/llama-3.1-8b-instruct',
+    ];
+    assert.equal(matchModelByTier('claude-3-haiku-20240307', models), 'meta/llama-3.1-8b-instruct');
+    assert.equal(matchModelByTier('claude-3-5-sonnet-20241022', models), 'meta/llama-3.1-70b-instruct');
+    assert.equal(matchModelByTier('claude-3-opus-20240229', models), 'meta/llama-3.1-405b-instruct');
+  });
+
+  it('falls back to single model when only one model is available', () => {
+    const models = ['z-ai/glm-5.3-flash'];
+    assert.equal(matchModelByTier('claude-3-haiku-20240307', models), 'z-ai/glm-5.3-flash');
+    assert.equal(matchModelByTier('claude-3-5-sonnet-20241022', models), 'z-ai/glm-5.3-flash');
+    assert.equal(matchModelByTier('claude-3-opus-20240229', models), 'z-ai/glm-5.3-flash');
+  });
+
+  it('distributes all mappings across tiers simultaneously', () => {
+    const claudeModels = [
+      'claude-3-5-sonnet-20241022',
+      'claude-3-opus-20240229',
+      'claude-3-haiku-20240307',
+    ];
+    const models = ['z-ai/glm-5.3', 'z-ai/glm-5.3-flash'];
+    const distributed = distributeModelsByTier(claudeModels, models, 'z-ai/glm-5.3');
+    assert.deepEqual(distributed, {
+      'claude-3-5-sonnet-20241022': 'z-ai/glm-5.3',
+      'claude-3-opus-20240229': 'z-ai/glm-5.3',
+      'claude-3-haiku-20240307': 'z-ai/glm-5.3-flash',
+    });
   });
 });

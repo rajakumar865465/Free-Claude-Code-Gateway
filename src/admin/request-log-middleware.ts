@@ -5,17 +5,23 @@ import { newRequestId } from '../utils/request-id';
 function extractTokens(body: unknown): { input: number; output: number } {
   if (!body || typeof body !== 'object') return { input: 0, output: 0 };
   const b = body as Record<string, unknown>;
+  let input = 0;
+  let output = 0;
+  
   if (typeof b.usage === 'object' && b.usage) {
     const u = b.usage as Record<string, unknown>;
-    const input = Number(
+    input = Number(
       (u.prompt_tokens as number) ?? (u.input_tokens as number) ?? 0,
     ) || 0;
-    const output = Number(
+    output = Number(
       (u.completion_tokens as number) ?? (u.output_tokens as number) ?? 0,
     ) || 0;
-    return { input, output };
+  } else {
+    input = Number((b.prompt_tokens as number) ?? (b.input_tokens as number) ?? 0) || 0;
+    output = Number((b.completion_tokens as number) ?? (b.output_tokens as number) ?? 0) || 0;
   }
-  return { input: 0, output: 0 };
+  
+  return { input, output };
 }
 
 function recordFromLocals(state: AdminState, req: Request, res: Response, start: number): void {

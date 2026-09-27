@@ -7,15 +7,28 @@ export function buildRateLimiter() {
     limit: () => getConfig().rateLimitPerMinute,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
-    handler: (_req, res) => {
+    handler: (req, res) => {
       const cfg = getConfig();
-      res.status(429).json({
-        type: 'error',
-        error: {
-          type: 'rate_limit_error',
-          message: `Rate limit exceeded. Limit: ${cfg.rateLimitPerMinute}/min.`,
-        },
-      });
+      res.setHeader('Retry-After', '60');
+      const isOpenAI = req.originalUrl?.startsWith('/v1/chat') || req.originalUrl?.startsWith('/v1/models');
+      if (isOpenAI) {
+        res.status(429).json({
+          error: {
+            message: `Rate limit exceeded. Limit: ${cfg.rateLimitPerMinute}/min.`,
+            type: 'rate_limit_error',
+            param: null,
+            code: 429,
+          },
+        });
+      } else {
+        res.status(429).json({
+          type: 'error',
+          error: {
+            type: 'rate_limit_error',
+            message: `Rate limit exceeded. Limit: ${cfg.rateLimitPerMinute}/min.`,
+          },
+        });
+      }
     },
   });
 }

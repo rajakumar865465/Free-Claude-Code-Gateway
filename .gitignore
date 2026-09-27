@@ -1,8 +1,14 @@
 node_modules/
 dist/
 .env
+.env*
+*.env
 .env.local
 .env.*.local
+*.pem
+*.key
+credentials*
+*.secret
 *.log
 npm-debug.log*
 yarn-debug.log*

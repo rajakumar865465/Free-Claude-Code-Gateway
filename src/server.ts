@@ -8,7 +8,7 @@ import { buildHealthRouter } from './routes/health.routes';
 import { buildModelsRouter } from './routes/models.routes';
 import { buildMessagesRouter } from './routes/messages.routes';
 import { buildChatCompletionsRouter } from './routes/chat-completions.routes';
-import { authMiddleware } from './middleware/auth';
+import { buildAuthMiddleware } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { buildRateLimiter } from './middleware/rate-limit';
 import { buildCors } from './middleware/cors';
@@ -18,12 +18,16 @@ import { buildRequestLogMiddleware } from './admin/request-log-middleware';
 import { buildAdminAuth } from './admin/middleware/admin-auth';
 import { buildAdminApiRouter } from './admin/routes/admin-api.routes';
 import { truncateFile } from './admin/persist';
+import { healthChecker } from './provider-failover/health-checker';
 
 function createApp(): Application {
   const cfg = loadConfig();
   const app = express();
   const state = new AdminState(cfg.clearLogOnRestart);
   const service = new BluesmindsService({ configManager: state.configManager });
+
+  // Start provider health checker in the background
+  healthChecker.start(state.failoverEngine);
 
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
@@ -47,6 +51,13 @@ function createApp(): Application {
   // /admin/api/* — requires auth when enabled.
   app.use('/admin/api', adminAuth, adminApi);
 
+  // /admin/provider-failover — serve the dedicated failover dashboard page
+  app.get(['/admin/provider-failover', '/admin/provider-failover.html'], adminAuth, (_req, res, next) => {
+    res.sendFile(path.join(adminAssetsDir, 'provider-failover.html'), (err) => {
+      if (err) next(err);
+    });
+  });
+
   // /admin and /admin/* — SPA fallback (HTML) when not /admin/api/* or /admin/assets/*.
   // Excludes auth-gated routes already handled.
   app.get(/^\/admin(\/.*)?$/, adminAuth, (_req, res, next) => {
@@ -59,13 +70,21 @@ function createApp(): Application {
     });
   });
 
+  // Normalize double /v1 prefix (e.g. when base URL is configured as http://host:port/v1 in Claude Desktop)
+  app.use((req, _res, next) => {
+    if (req.url.startsWith('/v1/v1/')) {
+      req.url = req.url.replace(/^\/v1\/v1\//, '/v1/');
+    }
+    next();
+  });
+
   // requestLogger must be registered BEFORE apiRouter so it attaches
   // res.on('finish') listeners before route handlers run.
   app.use(requestLogger);
 
   const apiRouter = express.Router();
   apiRouter.use(buildRateLimiter());
-  apiRouter.use(authMiddleware);
+  apiRouter.use(buildAuthMiddleware(state));
   apiRouter.use(buildRequestLogMiddleware(state));
   apiRouter.use(buildModelsRouter(service, state));
   apiRouter.use(buildMessagesRouter(service, state));

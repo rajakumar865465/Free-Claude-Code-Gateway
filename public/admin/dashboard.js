@@ -153,7 +153,9 @@
       init.headers['Content-Type'] = 'application/json';
       init.body = JSON.stringify(body);
     }
-    const res = await fetch(`/admin/api${path}`, init);
+    // Build a clean base URL without credentials (Chrome blocks fetch when credentials are in the URL)
+    const _cleanBase = `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`;
+    const res = await fetch(`${_cleanBase}/admin/api${path}`, init);
     let data = null;
     try { data = await res.json(); } catch { /* ignore */ }
     if (!res.ok) {
@@ -192,6 +194,7 @@
     settings: ['Gateway Settings', 'Configure provider connection, security, rate limits, and behavior.'],
     diagnostics: ['Provider Diagnostics', 'Step-by-step checks for provider connectivity and translation.'],
     context: ['Auto-Compact Context', 'Track token usage, auto-compact conversations, and preserve session state.'],
+    apikeys: ['API Keys & Setup', 'Generate gateway API keys and configure Claude Desktop, Claude Code, Codex, and OpenAI tools.'],
   };
 
   function switchView(view) {
@@ -223,6 +226,9 @@
       // Context page loaded via the module's own handler registered with data-view="context" clicks
       // Also call it directly here as a safety net
       if (typeof window.__loadContextPage === 'function') window.__loadContextPage();
+    }
+    if (view === 'apikeys') {
+      loadApiKeysPage();
     }
     if (view === 'overview') {
       loadStats();
@@ -1292,7 +1298,8 @@
      SECTION 12 — Copy Proxy URL
      ══════════════════════════════════════════════════════════════════ */
   function getProxyBase() {
-    return `${location.protocol}//${location.host}`;
+    // Build a clean URL with no credentials (avoids Chrome fetch block)
+    return `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`;
   }
 
   function copyCurlToClipboard(label = 'cURL') {
@@ -2706,6 +2713,20 @@
       state.defaultModel = data.default || '';
       // Store family rules from backend — these are now real, not hardcoded
       state.familyRules = data.familyRules || [];
+      state.activeProvider = data.activeProvider || null;
+      state.providerModels = data.providerModels || [];
+      const activeList = (state.activeProvider && Array.isArray(state.activeProvider.models)) ? state.activeProvider.models : [];
+      const cachedList = Array.isArray(data.cachedModels) ? data.cachedModels : [];
+      const mergedList = Array.from(new Set([...activeList, ...cachedList])).filter(Boolean);
+      if (mergedList.length > 0) {
+        state.availableModels = mergedList;
+        state.availableModelsCachedAt = data.cachedAt || new Date().toISOString();
+      } else if (state.activeProvider && state.activeProvider.defaultModel) {
+        state.availableModels = [state.activeProvider.defaultModel];
+        state.availableModelsCachedAt = new Date().toISOString();
+      } else {
+        state.availableModels = [];
+      }
       const defaultInput = $('#default-model-input');
       if (defaultInput) defaultInput.value = state.defaultModel;
       renderMappingsTable();
@@ -2713,6 +2734,24 @@
       renderFamilyRules();
       renderAutoFallback();
       renderAvailableModels();
+      updateAutoMapButton();
+
+      // If active provider has no models or <= 1 model, auto-sync from provider in background
+      if (state.activeProvider && (!state.availableModels || state.availableModels.length <= 1)) {
+        api('GET', '/models/available').then((res) => {
+          if (res.models && res.models.length > 0) {
+            state.availableModels = res.models;
+            state.availableModelsCachedAt = res.syncedAt || new Date().toISOString();
+            if (state.activeProvider) {
+              state.activeProvider.models = res.models;
+              const pInList = providerState.providers.find((p) => p.id === state.activeProvider.id);
+              if (pInList) pInList.models = res.models;
+            }
+            renderAvailableModels();
+            updateAutoMapButton();
+          }
+        }).catch(() => {});
+      }
     } catch (err) {
       toast(`Mappings load failed: ${err.message}`, 'error', 'Load failed');
     }
@@ -2752,10 +2791,14 @@
             <input class="mapping-input ${isDirty ? 'is-dirty' : ''}" data-field="key" data-original="${escapeAttr(k)}" value="${escapeAttr(k)}" placeholder="claude-opus-4-5-20251101" />
           </div>
         </td>
-        <td><span class="mapping-provider-badge">upstream</span></td>
+        <td><span class="mapping-provider-badge">${escapeHtml(state.activeProvider?.name || 'upstream')}</span></td>
         <td>
           <div class="mapping-input-cell">
             <input class="mapping-input ${isDirty ? 'is-dirty' : ''}" data-field="val" data-original="${escapeAttr(k)}" value="${escapeAttr(v)}" placeholder="moonshotai/kimi-k2.6" list="provider-models-list" />
+            <button type="button" class="btn btn-secondary btn-sm model-picker-btn" data-picker-key="${escapeAttr(k)}" title="Switch / Select from fetched provider models">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon-xs"><path d="m6 9 6 6 6-6"/></svg>
+              <span>Switch</span>
+            </button>
             ${badgeHtml}
           </div>
         </td>
@@ -2814,6 +2857,18 @@
       });
     });
 
+    /* Wire model picker buttons */
+    tbody.querySelectorAll('.model-picker-btn[data-picker-key]').forEach((btn) => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const key = btn.getAttribute('data-picker-key');
+        const valInput = btn.closest('.mapping-input-cell')?.querySelector('input[data-field="val"]');
+        if (valInput) {
+          openModelPickerPopover(btn, valInput, key);
+        }
+      });
+    });
+
     /* Wire suggestion badge clicks — fill input with suggested value */
     tbody.querySelectorAll('.suggestion-badge[data-suggest]').forEach((badge) => {
       badge.addEventListener('click', () => {
@@ -2844,12 +2899,20 @@
 
   function updateAutoMapButton() {
     const btn = $('#auto-map-btn');
-    if (!btn) return;
+    const tierBtn = $('#smart-tier-match-btn');
     const hasModels = state.availableModels.length > 0;
-    btn.disabled = !hasModels;
-    btn.title = hasModels
-      ? 'Suggest provider model IDs based on the synced model list'
-      : 'Sync Models first to enable Auto-Map';
+    if (btn) {
+      btn.disabled = !hasModels;
+      btn.title = hasModels
+        ? 'Suggest provider model IDs based on the synced model list'
+        : 'Sync Models first to enable Auto-Map';
+    }
+    if (tierBtn) {
+      tierBtn.disabled = !hasModels;
+      tierBtn.title = hasModels
+        ? 'Automatically distribute Haiku, Sonnet, and Opus across provider model tiers'
+        : 'Sync Models first to enable Smart Tier Match';
+    }
   }
 
   function renderApplySuggestionsBar() {
@@ -3245,7 +3308,9 @@
     const body = $('#available-body');
     const label = $('#available-count-label');
     if (!body) return;
-    const all = state.availableModels || [];
+    const all = (state.availableModels && state.availableModels.length > 0)
+      ? state.availableModels
+      : (state.activeProvider?.models || (state.activeProvider?.defaultModel ? [state.activeProvider.defaultModel] : []));
     const staleLabel = (() => {
       if (!state.availableModelsCachedAt) return '';
       const ageMs = Date.now() - new Date(state.availableModelsCachedAt).getTime();
@@ -3255,12 +3320,18 @@
       if (mins >= 1) return ` — synced ${mins}m ago`;
       return ' — just synced';
     })();
-    if (label) label.textContent = `${all.length} synced${staleLabel}`;
+    if (label) label.textContent = `${all.length} available${staleLabel}`;
 
     /* Populate autocomplete datalist for Provider Model inputs */
     const dl = document.getElementById('provider-models-list');
     if (dl) {
-      dl.innerHTML = all.slice(0, 300).map((id) => `<option value="${escapeAttr(id)}"></option>`).join('');
+      const allDatalistModels = Array.from(new Set([
+        ...all,
+        ...(state.activeProvider?.models || []),
+        ...(state.activeProvider?.defaultModel ? [state.activeProvider.defaultModel] : []),
+        ...((state.providerModels || []).flatMap((p) => [...(p.models || []), p.defaultModel].filter(Boolean)))
+      ]));
+      dl.innerHTML = allDatalistModels.slice(0, 300).map((id) => `<option value="${escapeAttr(id)}"></option>`).join('');
     }
 
     if (all.length === 0) {
@@ -3313,6 +3384,7 @@
     });
     body.innerHTML = '';
     body.appendChild(list);
+    updateAutoMapButton();
   }
 
   /* Popover for provider model pill actions */
@@ -3423,6 +3495,298 @@
     } else if (activePopover) {
       document.addEventListener('click', closeProviderPillPopoverOnOutside, { once: true });
     }
+  }
+
+  /* ── Dedicated Model Picker Popover (for row Switch & default fallback) ── */
+  let activeModelPicker = null;
+
+  function closeModelPickerPopover() {
+    if (activeModelPicker) {
+      activeModelPicker.remove();
+      activeModelPicker = null;
+    }
+    $$('.model-picker-btn.is-popover-open').forEach((b) => b.classList.remove('is-popover-open'));
+    document.removeEventListener('keydown', handleModelPickerEscape);
+    document.removeEventListener('click', handleModelPickerOutside);
+  }
+
+  function handleModelPickerEscape(ev) {
+    if (ev.key === 'Escape') closeModelPickerPopover();
+  }
+
+  function handleModelPickerOutside(ev) {
+    if (activeModelPicker && !activeModelPicker.contains(ev.target) && !ev.target.closest('.model-picker-btn')) {
+      closeModelPickerPopover();
+    }
+  }
+
+  function renderModelPickerItems(models, currentVal, query = '') {
+    const q = (query || '').trim().toLowerCase();
+    let html = '';
+
+    // If query is typed, offer direct custom selection option at top
+    if (query && query.trim()) {
+      const trimmedQ = query.trim();
+      html += `
+        <div class="model-picker-custom-item" data-model="${escapeAttr(trimmedQ)}" title="Use custom model: ${escapeAttr(trimmedQ)}">
+          <span class="model-picker-custom-icon">✨</span>
+          <div class="model-picker-custom-text">
+            <span>Use custom: <strong>${escapeHtml(trimmedQ)}</strong></span>
+            <small>Press Enter or click to apply</small>
+          </div>
+          <button type="button" class="btn btn-primary btn-xs" style="pointer-events:none">Apply</button>
+        </div>
+      `;
+    }
+
+    // Active Provider Models ONLY
+    const activeName = state.activeProvider?.name || 'Active Provider';
+    const rawList = Array.isArray(models) && models.length > 0
+      ? models
+      : Array.from(new Set([
+          ...(state.activeProvider?.models || []),
+          ...(state.availableModels || []),
+          ...(state.activeProvider?.defaultModel ? [state.activeProvider.defaultModel] : [])
+        ].filter(Boolean)));
+    const activeList = Array.from(new Set(rawList.filter(Boolean)));
+    const filteredActive = q
+      ? activeList.filter((m) => typeof m === 'string' && m.toLowerCase().includes(q))
+      : activeList;
+
+    if (filteredActive.length > 0) {
+      html += `<div class="model-picker-group-title">
+        <span>${escapeHtml(activeName)}</span>
+        <span class="model-picker-group-badge">${filteredActive.length} Model${filteredActive.length === 1 ? '' : 's'}</span>
+      </div>`;
+      filteredActive.forEach((m) => {
+        const isCurrent = m === currentVal;
+        html += `
+          <button type="button" class="model-picker-item ${isCurrent ? 'is-current' : ''}" data-model="${escapeAttr(m)}" title="${escapeAttr(m)}">
+            <span class="model-picker-item-name">${escapeHtml(m)}</span>
+            ${isCurrent ? '<span class="model-picker-badge-current">✓ Active</span>' : ''}
+          </button>
+        `;
+      });
+    }
+
+    if (!html) {
+      if (query) {
+        return `<div class="model-picker-empty"><span>No models matching "<strong>${escapeHtml(query)}</strong>"</span></div>`;
+      }
+      return `
+        <div class="model-picker-empty">
+          <p>No models configured or fetched for <strong>${escapeHtml(activeName)}</strong> yet.</p>
+          <button type="button" class="btn btn-primary btn-sm model-picker-sync-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            Sync Models Now
+          </button>
+        </div>`;
+    }
+
+    return html;
+  }
+
+  async function autoSaveMappingPick(claudeModelKey, model) {
+    rebuildMappingFromTable();
+    try {
+      const payload = { mappings: state.mappings, default: state.defaultModel || $('#default-model-input')?.value?.trim() || '' };
+      const updated = await api('PUT', '/models/mappings', payload);
+      state.mappings = updated.mappings || {};
+      state.savedMappings = { ...(updated.mappings || {}) };
+      state.defaultModel = updated.default || state.defaultModel;
+      renderMappingsTable();
+      renderRouterHealth();
+      renderAutoFallback();
+    } catch (err) {
+      toast(`Mapping saved locally — click "Save Router" to persist to server.`, 'warn', 'Save Later');
+    }
+  }
+
+  function wireModelPickerItemClicks(pop, targetInput, claudeModelKey) {
+    pop.querySelectorAll('.model-picker-item[data-model], .model-picker-custom-item[data-model]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const model = btn.getAttribute('data-model');
+        if (!model) return;
+        targetInput.value = model;
+        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+        if (claudeModelKey === '__default__') {
+          state.defaultModel = model;
+          renderFamilyRules();
+          renderRouterHealth();
+          renderAutoFallback();
+          closeModelPickerPopover();
+          await autoSaveMappingPick('__default__', model);
+          toast(`✓ Default fallback → ${model} (saved)`, 'ok', 'Saved');
+        } else {
+          closeModelPickerPopover();
+          await autoSaveMappingPick(claudeModelKey, model);
+          toast(`✓ "${claudeModelKey}" → ${model} (saved)`, 'ok', 'Saved');
+        }
+      });
+    });
+  }
+
+  function openModelPickerPopover(anchor, targetInput, claudeModelKey) {
+    closeModelPickerPopover();
+    closeProviderPillPopover();
+
+    const isDefault = claudeModelKey === '__default__';
+    const activeProviderModels = Array.from(new Set([
+      ...(state.activeProvider?.models || []),
+      ...(state.availableModels || []),
+      ...(state.activeProvider?.defaultModel ? [state.activeProvider.defaultModel] : [])
+    ].filter(Boolean)));
+    const currentVal = (targetInput.value || '').trim();
+
+    const pop = document.createElement('div');
+    pop.className = 'popover model-picker-popover';
+    pop.setAttribute('data-popover', 'model-picker');
+
+    const titleText = isDefault ? 'Default Fallback' : escapeHtml(claudeModelKey);
+    const activeName = state.activeProvider?.name || 'Active Provider';
+    const totalCount = activeProviderModels.length;
+
+    pop.innerHTML = `
+      <div class="model-picker-head">
+        <div class="model-picker-head-label">Switch Provider Model · <strong style="color:var(--text)">${escapeHtml(activeName)}</strong></div>
+        <div class="model-picker-head-title">${titleText}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+          <div class="model-picker-head-count">${totalCount} model${totalCount === 1 ? '' : 's'} available</div>
+          <button type="button" class="btn btn-ghost btn-xs model-picker-sync-head-btn" style="color:var(--primary);font-weight:600;display:inline-flex;align-items:center;gap:4px;padding:2px 6px;cursor:pointer" title="Fetch all upstream models from ${escapeAttr(activeName)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            ⚡ Sync All Models
+          </button>
+        </div>
+      </div>
+      <div class="model-picker-search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="model-picker-search-icon">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" class="model-picker-search-input" placeholder="Search or type custom model (e.g. kimi 2.5)..." autocomplete="off" />
+      </div>
+      <div class="model-picker-list" role="listbox">
+        ${renderModelPickerItems(activeProviderModels, currentVal)}
+      </div>
+    `;
+
+    document.body.appendChild(pop);
+
+    /* Positioning */
+    const rect = anchor.getBoundingClientRect();
+    const popRect = pop.getBoundingClientRect();
+    let top = rect.bottom + 6;
+    let left = rect.left;
+    if (left + popRect.width > window.innerWidth - 12) left = window.innerWidth - popRect.width - 12;
+    if (left < 12) left = 12;
+    if (top + popRect.height > window.innerHeight - 12) {
+      top = rect.top - popRect.height - 6;
+      if (top < 12) top = 12;
+    }
+    pop.style.top = `${top}px`;
+    pop.style.left = `${left}px`;
+    anchor.classList.add('is-popover-open');
+
+    /* Focus search input & filter */
+    const searchInp = pop.querySelector('.model-picker-search-input');
+    if (searchInp) {
+      setTimeout(() => searchInp.focus(), 50);
+      searchInp.addEventListener('input', () => {
+        const query = searchInp.value;
+        const listEl = pop.querySelector('.model-picker-list');
+        if (!listEl) return;
+        const currentActiveList = Array.from(new Set([
+          ...(state.activeProvider?.models || []),
+          ...(state.availableModels || []),
+          ...(state.activeProvider?.defaultModel ? [state.activeProvider.defaultModel] : [])
+        ].filter(Boolean)));
+        listEl.innerHTML = renderModelPickerItems(currentActiveList, currentVal, query);
+        wireModelPickerItemClicks(pop, targetInput, claudeModelKey);
+      });
+      searchInp.addEventListener('keydown', async (ev) => {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          const val = searchInp.value.trim();
+          if (val) {
+            targetInput.value = val;
+            targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+            if (claudeModelKey === '__default__') {
+              state.defaultModel = val;
+              renderFamilyRules();
+              renderRouterHealth();
+              renderAutoFallback();
+            }
+            closeModelPickerPopover();
+            await autoSaveMappingPick(claudeModelKey, val);
+            toast(`✓ "${claudeModelKey}" → ${val} (saved)`, 'ok', 'Saved');
+          }
+        }
+      });
+    }
+
+    wireModelPickerItemClicks(pop, targetInput, claudeModelKey);
+
+    /* Sync logic for model picker popover */
+    async function syncCurrentProviderModels(isAuto = false) {
+      const headBtn = pop.querySelector('.model-picker-sync-head-btn');
+      const emptyBtn = pop.querySelector('.model-picker-sync-btn');
+      if (headBtn) {
+        headBtn.disabled = true;
+        headBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="animation:spin 1s linear infinite;width:12px;height:12px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg> Syncing…';
+      }
+      if (emptyBtn) emptyBtn.classList.add('btn-loading');
+      try {
+        const res = await api('GET', '/models/available');
+        const newModels = res.models || [];
+        if (newModels.length > 0) {
+          state.availableModels = newModels;
+          state.availableModelsCachedAt = res.syncedAt || new Date().toISOString();
+          if (state.activeProvider) {
+            state.activeProvider.models = newModels;
+            const pInList = providerState.providers.find((p) => p.id === state.activeProvider.id);
+            if (pInList) pInList.models = newModels;
+          }
+          renderAvailableModels();
+          updateAutoMapButton();
+          renderMappingsTable();
+          renderProviderCards();
+          const listEl = pop.querySelector('.model-picker-list');
+          if (listEl) {
+            listEl.innerHTML = renderModelPickerItems(newModels, currentVal, searchInp?.value || '');
+            wireModelPickerItemClicks(pop, targetInput, claudeModelKey);
+          }
+          const countEl = pop.querySelector('.model-picker-head-count');
+          if (countEl) countEl.textContent = `${newModels.length} models available`;
+          if (!isAuto) toast(`Synced ${newModels.length} models from ${activeName}!`, 'ok', 'Models Synced');
+        } else if (!isAuto) {
+          toast(res.message || 'No models returned by provider.', 'info');
+        }
+      } catch (err) {
+        if (!isAuto) toast(err.message || 'Sync failed', 'err', 'Sync Failed');
+      } finally {
+        if (headBtn) {
+          headBtn.disabled = false;
+          headBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg> ⚡ Sync All Models';
+        }
+        if (emptyBtn) emptyBtn.classList.remove('btn-loading');
+      }
+    }
+
+    const headSyncBtn = pop.querySelector('.model-picker-sync-head-btn');
+    if (headSyncBtn) headSyncBtn.addEventListener('click', () => syncCurrentProviderModels(false));
+
+    const syncBtn = pop.querySelector('.model-picker-sync-btn');
+    if (syncBtn) syncBtn.addEventListener('click', () => syncCurrentProviderModels(false));
+
+    // Auto-sync if active provider only has 1 or fewer models currently loaded
+    if (totalCount <= 1 && state.activeProvider) {
+      setTimeout(() => syncCurrentProviderModels(true), 60);
+    }
+
+    activeModelPicker = pop;
+    setTimeout(() => {
+      document.addEventListener('click', handleModelPickerOutside);
+      document.addEventListener('keydown', handleModelPickerEscape);
+    }, 10);
   }
 
   /* ── Toolbar actions ──────────────────────────────────────────── */
@@ -3572,6 +3936,18 @@
     });
   }
 
+  /* Default model picker button */
+  const defaultModelPickerBtn = $('#default-model-picker-btn');
+  if (defaultModelPickerBtn) {
+    defaultModelPickerBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const defInput = $('#default-model-input');
+      if (defInput) {
+        openModelPickerPopover(defaultModelPickerBtn, defInput, '__default__');
+      }
+    });
+  }
+
   /* Available models toolbar */
   const availableSearch = $('#available-search');
   if (availableSearch) {
@@ -3603,6 +3979,50 @@
     });
   }
 
+  /* ── Smart Tier Match button ──────────────────────────────────── */
+  const smartTierMatchBtn = $('#smart-tier-match-btn');
+  if (smartTierMatchBtn) {
+    smartTierMatchBtn.addEventListener('click', async () => {
+      if (state.availableModels.length === 0) {
+        toast('Sync models from provider first.', 'warn', 'No models');
+        return;
+      }
+      smartTierMatchBtn.classList.add('btn-loading');
+      try {
+        const defaultModel = ($('#default-model-input')?.value || '').trim() || undefined;
+        const res = await api('POST', '/models/smart-tier-match', {
+          models: state.availableModels,
+          defaultModel,
+        });
+        if (res && res.mappings) {
+          state.mappings = { ...state.mappings, ...res.mappings };
+          renderMappingsTable();
+          // Mark inputs dirty
+          document.querySelectorAll('#mappings-tbody input[data-field="val"]').forEach((inp) => {
+            const tr = inp.closest('tr');
+            const original = inp.getAttribute('data-original');
+            const newVal = inp.value.trim();
+            const inSaved = original in state.savedMappings;
+            const dirty = !inSaved || state.savedMappings[original] !== newVal;
+            inp.classList.toggle('is-dirty', dirty);
+            const statusEl = tr?.querySelector('.mapping-status');
+            if (statusEl && dirty) {
+              statusEl.className = 'mapping-status status-unsaved';
+              statusEl.textContent = 'Unsaved changes';
+            }
+          });
+          rebuildMappingFromTable();
+          renderRouterHealth();
+          toast('Distributed models across provider tiers! Click "Save Router" to apply.', 'ok', 'Tier Match Applied');
+        }
+      } catch (err) {
+        toast(err.message || 'Smart Tier Match failed', 'err', 'Error');
+      } finally {
+        smartTierMatchBtn.classList.remove('btn-loading');
+      }
+    });
+  }
+
   /* ── Fetch available models ──────────────────────────────────────── */
   const refreshAvailableBtn = $('#refresh-available');
   if (refreshAvailableBtn) {
@@ -3618,11 +4038,15 @@
         const data = await api('GET', '/models/available');
         state.availableModels = data.models || [];
         state.availableModelsCachedAt = data.syncedAt || null;
+        if (state.activeProvider) {
+          state.activeProvider.models = state.availableModels;
+        }
         state.suggestions = [];
         state.defaultSuggestion = null;
         renderAvailableModels();
         renderSetupChecklist();
         updateAutoMapButton();
+        renderMappingsTable();
       } catch (err) {
         errEl.textContent = err.message;
         list.innerHTML = '<div class="router-section-empty"><span class="router-section-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span>Sync failed. Check provider connection.</div>';
@@ -3771,7 +4195,18 @@
 
   function buildPgCurl(endpoint) {
     const { url, body } = buildPgBody();
-    return `curl -X POST ${getProxyBase()}${url} \\\n  -H "Content-Type: application/json" \\\n  -d '${JSON.stringify(body)}'`;
+    const pKey = $('#proxy-api-key')?.value?.trim();
+    const authHeader = (pKey && pKey !== '•••••••••••••••••••') ? ` \\\n  -H "x-api-key: ${pKey}"` : '';
+    return `curl -X POST ${getProxyBase()}${url} \\\n  -H "Content-Type: application/json"${authHeader} \\\n  -d '${JSON.stringify(body)}'`;
+  }
+
+  function getPgHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    const pKey = $('#proxy-api-key')?.value?.trim();
+    if (pKey && pKey !== '•••••••••••••••••••') {
+      headers['x-api-key'] = pKey;
+    }
+    return headers;
   }
 
   function setPgRunning(running) {
@@ -3856,7 +4291,8 @@
 
       try {
         if ($('#pg-stream').checked) {
-          const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const _pgBase = `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`;
+          const res = await fetch(`${_pgBase}${url}`, { method: 'POST', headers: getPgHeaders(), body: JSON.stringify(body) });
           const latency = Math.round(performance.now() - start);
 
           if (!res.ok) {
@@ -3907,7 +4343,8 @@
           state.lastPgResponse = rawChunks;
           updatePgDebugTabs(body, curl, rawChunks);
         } else {
-          const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const _pgBase2 = `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`;
+          const res = await fetch(`${_pgBase2}${url}`, { method: 'POST', headers: getPgHeaders(), body: JSON.stringify(body) });
           const latency = Math.round(performance.now() - start);
           const data = await res.json().catch(() => ({}));
           state.lastPgResponse = data;
@@ -4093,6 +4530,12 @@
                 <span class="provider-info-chip-value" title="${escapeAttr(p.defaultModel)}">${escapeHtml(p.defaultModel) || '—'}</span>
               </div>
               <div class="provider-info-chip">
+                <span class="provider-info-chip-label">Models</span>
+                <span class="provider-info-chip-value" title="${escapeAttr((p.models || []).join(', '))}">
+                  ${(p.models && p.models.length > 0) ? `${p.models.length} model${p.models.length === 1 ? '' : 's'}` : (p.defaultModel ? '1 model' : 'None')}
+                </span>
+              </div>
+              <div class="provider-info-chip">
                 <span class="provider-info-chip-label">API Key</span>
                 <span class="provider-info-chip-value ${p.apiKeySet ? 'key-set' : 'key-missing'}">
                   ${p.apiKeySet ? escapeHtml(p.apiKeyPreview) : 'Not set'}
@@ -4153,21 +4596,19 @@
         if (typeof window.__refreshProviderSwitcher === 'function') {
           window.__refreshProviderSwitcher();
         }
-        if (data.restored) {
-          // Snapshot was restored immediately — reload mappings right away
-          if (typeof loadMappings === 'function') await loadMappings();
-          const p = providerState.providers.find((x) => x.id === id);
-          toast(`Switched to ${p?.name || 'provider'}. Your saved mappings have been restored.`, 'ok', 'Provider Restored');
-        } else {
-          toast(`Switched to provider. Syncing model mappings…`, 'ok', 'Provider Switched');
-          // New provider — wait for background remap then reload
-          setTimeout(async () => {
-            if (typeof loadMappings === 'function') {
-              await loadMappings();
-              toast('Model Router updated to new provider.', 'ok', 'Mappings Updated');
-            }
-          }, 2500);
+        if (typeof loadMappings === 'function') {
+          await loadMappings();
         }
+        const p = providerState.providers.find((x) => x.id === id);
+        const targetModel = data.target || p?.defaultModel;
+        const msgSuffix = data.restored
+          ? ' · Restored saved model mappings'
+          : (targetModel ? ` · Model Router updated to ${escapeHtml(targetModel)}` : '');
+        toast(
+          `Switched to ${p?.name || 'provider'}${msgSuffix}`,
+          'ok',
+          data.restored ? 'Provider Restored' : 'Provider Active',
+        );
       } catch (err) {
         toast(err.message || 'Failed to activate provider.', 'error');
         btn.disabled = false;
@@ -4200,6 +4641,12 @@
       btn.textContent = 'Syncing…';
       try {
         const result = await api('POST', `/providers/${id}/sync-models`);
+        const targetP = providerState.providers.find((x) => x.id === id);
+        if (targetP && Array.isArray(result.models) && result.models.length > 0) {
+          targetP.models = result.models;
+        }
+        renderProviderCards();
+
         if (result.remapped) {
           // Active provider — all mappings + family rules updated
           toast(
@@ -4214,7 +4661,17 @@
             api('POST', `/providers/${id}/save-snapshot`).catch(() => {});
           }
         } else {
-          toast(`Synced ${result.models.length} models from provider.`, 'ok', 'Models Synced');
+          if (providerState.activeId === id) {
+            if (state.activeProvider) state.activeProvider.models = result.models;
+            state.availableModels = result.models;
+            if (typeof loadMappings === 'function') await loadMappings();
+          }
+          // Check if there's a message (for providers that don't support model listing)
+          if (result.message) {
+            toast(result.message, 'info', 'Model Sync');
+          } else {
+            toast(`Synced ${result.models.length} models from provider.`, 'ok', 'Models Synced');
+          }
         }
       } catch (err) {
         toast(err.message || 'Sync failed.', 'error');
@@ -4305,34 +4762,240 @@
     const title = $('#provider-modal-title');
     const idInput = $('#provider-modal-id');
     const nameInput = $('#pf-name');
+    const typeInput = $('#pf-type');
     const urlInput = $('#pf-baseurl');
+    const urlField = $('#pf-baseurl-field');
+    const urlError = $('#pf-baseurl-error');
     const keyInput = $('#pf-apikey');
     const modelInput = $('#pf-model');
     const notesInput = $('#pf-notes');
     const keyHint = $('#pf-apikey-hint');
     const testResult = $('#pf-test-result');
+    const awsFields = $('#pf-aws-bedrock-fields');
+    const azureFields = $('#pf-azure-foundry-fields');
     if (!overlay) return;
+
+    // Clear any previous error
+    if (urlError) {
+      urlError.style.display = 'none';
+      urlError.textContent = '';
+    }
 
     if (provider) {
       title.textContent = 'Edit Provider';
       idInput.value = provider.id;
       nameInput.value = provider.name;
-      urlInput.value = provider.baseUrl;
+      const providerType = provider.type || 'openai-compatible';
+      if (typeInput) typeInput.value = providerType;
+      
+      // Show/hide fields based on provider type
+      if (urlField) {
+        if (providerType === 'openai-compatible') {
+          urlField.style.display = '';
+          urlInput.value = provider.baseUrl || '';
+          if (awsFields) awsFields.style.display = 'none';
+        } else if (providerType === 'aws_bedrock') {
+          urlField.style.display = 'none';
+          if (awsFields) awsFields.style.display = '';
+          if (azureFields) azureFields.style.display = 'none';
+          
+          // Populate AWS Region only
+          const regionInput = $('#pf-aws-region');
+          if (regionInput) regionInput.value = provider.awsRegion || '';
+          
+          // Populate AWS Bedrock model suggestions
+          setTimeout(() => {
+            const bedrockModels = [
+              // === Anthropic Claude ===
+              'us.anthropic.claude-sonnet-5',
+              'us.anthropic.claude-haiku-5',
+              'us.anthropic.claude-opus-5',
+              'us.anthropic.claude-opus-4-8',
+              'us.anthropic.claude-opus-4-7',
+              'us.anthropic.claude-sonnet-4-6',
+              'us.anthropic.claude-sonnet-4-5',
+              'us.anthropic.claude-haiku-4-5',
+              'anthropic.claude-3-5-sonnet-20241022-v2:0',
+              'anthropic.claude-3-5-haiku-20241022-v1:0',
+              'anthropic.claude-3-opus-20240229-v1:0',
+              
+              // === Amazon Nova ===
+              'us.amazon.nova-pro-v1:0',
+              'us.amazon.nova-lite-v1:0',
+              'us.amazon.nova-micro-v1:0',
+              'amazon.nova-canvas-v1:0',
+              'amazon.nova-reel-v1:0',
+              
+              // === Amazon Titan ===
+              'amazon.titan-text-premier-v1:0',
+              'amazon.titan-text-express-v1',
+              'amazon.titan-text-lite-v1',
+              'amazon.titan-embed-text-v2:0',
+              'amazon.titan-embed-text-v1',
+              'amazon.titan-image-generator-v2:0',
+              'amazon.titan-image-generator-v1',
+              
+              // === Meta Llama ===
+              'us.meta.llama3-3-70b-instruct-v1:0',
+              'us.meta.llama3-2-90b-instruct-v1:0',
+              'us.meta.llama3-2-11b-instruct-v1:0',
+              'us.meta.llama3-2-3b-instruct-v1:0',
+              'us.meta.llama3-2-1b-instruct-v1:0',
+              'meta.llama3-1-405b-instruct-v1:0',
+              'meta.llama3-1-70b-instruct-v1:0',
+              'meta.llama3-1-8b-instruct-v1:0',
+              
+              // === Mistral AI ===
+              'mistral.mistral-large-2407-v1:0',
+              'mistral.mistral-small-2402-v1:0',
+              'mistral.mixtral-8x7b-instruct-v0:1',
+              'mistral.mistral-7b-instruct-v0:2',
+              
+              // === DeepSeek ===
+              'us.deepseek.r1-v1:0',
+              'deepseek.deepseek-v3-1',
+              'deepseek.deepseek-r1',
+              
+              // === Cohere ===
+              'cohere.command-r-plus-v1:0',
+              'cohere.command-r-v1:0',
+              'cohere.command-text-v14',
+              'cohere.command-light-text-v14',
+              'cohere.embed-english-v3',
+              'cohere.embed-multilingual-v3',
+              
+              // === AI21 Labs ===
+              'ai21.jamba-1-5-large-v1:0',
+              'ai21.jamba-1-5-mini-v1:0',
+              'ai21.jamba-instruct-v1:0',
+              'ai21.j2-ultra-v1',
+              'ai21.j2-mid-v1',
+              
+              // === Stability AI ===
+              'stability.stable-diffusion-xl-v1',
+              'stability.stable-image-ultra-v1:0',
+              'stability.stable-image-core-v1:0',
+              'stability.sd3-large-v1:0',
+              
+              // === Google ===
+              'google.gemini-2-0-flash-thinking-exp-v1:0',
+              
+              // === Qwen ===
+              'qwen.qwen2-5-72b-instruct-v1:0',
+              'qwen.qwen2-5-7b-instruct-v1:0',
+              
+              // === MiniMax ===
+              'minimax.abab6-5s-chat-v1:0',
+              'minimax.abab6-5g-chat-v1:0',
+              
+              // === Moonshot AI ===
+              'moonshot.moonshot-v1-8k',
+              'moonshot.moonshot-v1-32k',
+              'moonshot.moonshot-v1-128k',
+              
+              // === Z.AI (Zhipu AI) ===
+              'zai.glm-5',
+              'zai.glm-4-7',
+              'zai.glm-4-plus',
+              'zai.glm-4-air',
+              'zai.glm-4-flash',
+            ];
+            if (typeof renderModelCombo === 'function') {
+              renderModelCombo(bedrockModels, provider.defaultModel);
+            }
+          }, 100);
+        } else if (providerType === 'azure_foundry') {
+          // Azure AI Foundry: show Azure fields, hide Base URL and AWS fields
+          urlField.style.display = 'none';
+          if (awsFields) awsFields.style.display = 'none';
+          if (azureFields) azureFields.style.display = '';
+          
+          // Pre-fill Azure fields from provider data
+          const azureEndpointInput = $('#pf-azure-endpoint');
+          const azureApiVersionInput = $('#pf-azure-api-version');
+          const azureApiFlavorInput = $('#pf-azure-api-flavor');
+          if (azureEndpointInput) azureEndpointInput.value = provider.baseUrl || '';
+          if (azureApiVersionInput) azureApiVersionInput.value = provider.azureApiVersion || '2024-05-01-preview';
+          if (azureApiFlavorInput) azureApiFlavorInput.value = provider.azureApiFlavor || 'chat_completions';
+          
+          // Populate Azure AI Foundry model suggestions
+          setTimeout(() => {
+            const azureModels = [
+              // === OpenAI GPT Models ===
+              'gpt-4o', 'gpt-4o-mini', 'gpt-4', 'gpt-4-turbo', 'gpt-4-turbo-preview',
+              'gpt-35-turbo', 'gpt-35-turbo-16k',
+              // === OpenAI o-series Reasoning ===
+              'o1', 'o1-mini', 'o1-preview', 'o3', 'o3-mini', 'o4-mini',
+              // === Microsoft Phi ===
+              'Phi-4', 'Phi-4-mini-instruct', 'Phi-3.5-MoE-instruct',
+              'Phi-3.5-mini-instruct', 'Phi-3-medium-128k-instruct', 'Phi-3-small-128k-instruct',
+              // === Meta Llama ===
+              'Meta-Llama-3-1-405B-Instruct', 'Meta-Llama-3-1-70B-Instruct',
+              'Meta-Llama-3-1-8B-Instruct', 'Meta-Llama-3-70B-Instruct', 'Meta-Llama-3-8B-Instruct',
+              'Llama-3.3-70B-Instruct', 'Llama-3.2-90B-Vision-Instruct', 'Llama-3.2-11B-Vision-Instruct',
+              // === Mistral ===
+              'Mistral-large-2411', 'Mistral-large', 'Mistral-small',
+              'Mistral-NeMo', 'Codestral-2501',
+              // === DeepSeek ===
+              'DeepSeek-R1', 'DeepSeek-R1-0528', 'DeepSeek-V3-0324',
+              // === Cohere ===
+              'Cohere-command-r-plus-08-2024', 'Cohere-command-r-08-2024',
+              'Cohere-command-r-plus', 'Cohere-command-r',
+              // === AI21 ===
+              'jamba-1-5-large', 'jamba-1-5-mini',
+              // === JAIS ===
+              'jais-30b-chat',
+            ];
+            if (typeof renderModelCombo === 'function') {
+              renderModelCombo(azureModels, provider.defaultModel);
+            }
+          }, 100);
+        } else {
+          // Built-in providers and Databricks - hide all custom fields
+          urlField.style.display = 'none';
+          if (awsFields) awsFields.style.display = 'none';
+          if (azureFields) azureFields.style.display = 'none';
+        }
+      }
+      
       keyInput.value = '';           // never pre-fill key
       keyInput.placeholder = provider.apiKeySet ? '(unchanged — enter new key to replace)' : 'sk-…';
       modelInput.value = provider.defaultModel;
       notesInput.value = provider.notes || '';
+      const availModelsInp = $('#pf-available-models');
+      if (availModelsInp) {
+        availModelsInp.value = Array.isArray(provider.models) ? provider.models.join(', ') : '';
+      }
       if (keyHint) keyHint.textContent = 'Leave blank to keep existing key.';
     } else {
       title.textContent = 'Add Provider';
       idInput.value = '';
       nameInput.value = '';
-      urlInput.value = '';
+      if (typeInput) typeInput.value = 'openai-compatible';
+      
+      // Show Base URL field by default (OpenAI Compatible) - empty, no prefill
+      if (urlField) urlField.style.display = '';
+      if (awsFields) awsFields.style.display = 'none';
+      if (azureFields) azureFields.style.display = 'none';
+      
+      urlInput.value = '';  // No default URL
       keyInput.value = '';
       keyInput.placeholder = 'sk-…';
       modelInput.value = '';
       notesInput.value = '';
+      const availModelsInp = $('#pf-available-models');
+      if (availModelsInp) availModelsInp.value = '';
       if (keyHint) keyHint.textContent = 'Your API key is stored locally and never sent to the browser in full.';
+      
+      // Clear AWS fields
+      const regionInput = $('#pf-aws-region');
+      if (regionInput) regionInput.value = '';
+      
+      // Clear Azure fields
+      const azureEndpointInput = $('#pf-azure-endpoint');
+      const azureApiVersionInput = $('#pf-azure-api-version');
+      if (azureEndpointInput) azureEndpointInput.value = '';
+      if (azureApiVersionInput) azureApiVersionInput.value = '2024-05-01-preview';
     }
 
     if (testResult) { testResult.textContent = ''; testResult.className = 'pf-test-result'; }
@@ -4340,6 +5003,14 @@
     setTimeout(() => nameInput?.focus(), 80);
     // Reset model combo so stale models from previous session don't show
     if (typeof resetModelCombo === 'function') resetModelCombo();
+    
+    // Trigger provider type change to populate models for AWS Bedrock
+    if (typeInput && typeInput.value === 'aws_bedrock') {
+      setTimeout(() => {
+        const event = new Event('change', { bubbles: true });
+        typeInput.dispatchEvent(event);
+      }, 150);
+    }
   }
 
   function closeProviderModal() {
@@ -4382,6 +5053,249 @@
           : '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
       }
     });
+  }
+
+  // ── AWS Secret show/hide ──────────────────────────────────────
+  // ── Provider Type selector - manage field visibility and defaults ──────────
+
+  const pfTypeInput = $('#pf-type');
+  const pfBaseUrlInput = $('#pf-baseurl');
+  const pfBaseUrlField = $('#pf-baseurl-field');
+  const pfBaseUrlError = $('#pf-baseurl-error');
+  const pfAwsBedrockFields = $('#pf-aws-bedrock-fields');
+  const pfAzureFoundryFields = $('#pf-azure-foundry-fields');
+  
+  // Store the last custom OpenAI-compatible URL entered by the user
+  let lastCustomOpenAIUrl = '';
+  
+  if (pfTypeInput && pfBaseUrlInput && pfBaseUrlField) {
+    pfTypeInput.addEventListener('change', () => {
+      const type = pfTypeInput.value;
+      
+      // Clear any error messages
+      if (pfBaseUrlError) {
+        pfBaseUrlError.style.display = 'none';
+        pfBaseUrlError.textContent = '';
+      }
+      
+      if (type === 'openai-compatible') {
+        // Show Base URL field for OpenAI Compatible
+        pfBaseUrlField.style.display = '';
+        if (pfAwsBedrockFields) pfAwsBedrockFields.style.display = 'none';
+        if (pfAzureFoundryFields) pfAzureFoundryFields.style.display = 'none';
+        
+        // Restore last custom URL if available, otherwise leave empty
+        if (!pfBaseUrlInput.value || pfBaseUrlInput.value.trim() === '') {
+          pfBaseUrlInput.value = lastCustomOpenAIUrl || '';
+        }
+      } else if (type === 'aws_bedrock') {
+        // Show AWS Bedrock fields, hide Base URL and Azure fields
+        pfBaseUrlField.style.display = 'none';
+        if (pfAwsBedrockFields) pfAwsBedrockFields.style.display = '';
+        if (pfAzureFoundryFields) pfAzureFoundryFields.style.display = 'none';
+        
+        // Save current Base URL if it was custom
+        if (pfBaseUrlInput.value && pfBaseUrlInput.value.trim() !== '') {
+          lastCustomOpenAIUrl = pfBaseUrlInput.value;
+        }
+        pfBaseUrlInput.value = '';
+        
+        // Populate AWS Bedrock model suggestions (comprehensive list)
+        const bedrockModels = [
+          // === Anthropic Claude ===
+          'us.anthropic.claude-sonnet-5',
+          'us.anthropic.claude-haiku-5',
+          'us.anthropic.claude-opus-5',
+          'us.anthropic.claude-opus-4-8',
+          'us.anthropic.claude-opus-4-7',
+          'us.anthropic.claude-sonnet-4-6',
+          'us.anthropic.claude-sonnet-4-5',
+          'us.anthropic.claude-haiku-4-5',
+          'anthropic.claude-3-5-sonnet-20241022-v2:0',
+          'anthropic.claude-3-5-haiku-20241022-v1:0',
+          'anthropic.claude-3-opus-20240229-v1:0',
+          
+          // === Amazon Nova ===
+          'us.amazon.nova-pro-v1:0',
+          'us.amazon.nova-lite-v1:0',
+          'us.amazon.nova-micro-v1:0',
+          'amazon.nova-canvas-v1:0',
+          'amazon.nova-reel-v1:0',
+          
+          // === Amazon Titan ===
+          'amazon.titan-text-premier-v1:0',
+          'amazon.titan-text-express-v1',
+          'amazon.titan-text-lite-v1',
+          'amazon.titan-embed-text-v2:0',
+          'amazon.titan-embed-text-v1',
+          'amazon.titan-image-generator-v2:0',
+          'amazon.titan-image-generator-v1',
+          
+          // === Meta Llama ===
+          'us.meta.llama3-3-70b-instruct-v1:0',
+          'us.meta.llama3-2-90b-instruct-v1:0',
+          'us.meta.llama3-2-11b-instruct-v1:0',
+          'us.meta.llama3-2-3b-instruct-v1:0',
+          'us.meta.llama3-2-1b-instruct-v1:0',
+          'meta.llama3-1-405b-instruct-v1:0',
+          'meta.llama3-1-70b-instruct-v1:0',
+          'meta.llama3-1-8b-instruct-v1:0',
+          
+          // === Mistral AI ===
+          'mistral.mistral-large-2407-v1:0',
+          'mistral.mistral-small-2402-v1:0',
+          'mistral.mixtral-8x7b-instruct-v0:1',
+          'mistral.mistral-7b-instruct-v0:2',
+          
+          // === DeepSeek ===
+          'us.deepseek.r1-v1:0',
+          'deepseek.deepseek-v3-1',
+          'deepseek.deepseek-r1',
+          
+          // === Cohere ===
+          'cohere.command-r-plus-v1:0',
+          'cohere.command-r-v1:0',
+          'cohere.command-text-v14',
+          'cohere.command-light-text-v14',
+          'cohere.embed-english-v3',
+          'cohere.embed-multilingual-v3',
+          
+          // === AI21 Labs ===
+          'ai21.jamba-1-5-large-v1:0',
+          'ai21.jamba-1-5-mini-v1:0',
+          'ai21.jamba-instruct-v1:0',
+          'ai21.j2-ultra-v1',
+          'ai21.j2-mid-v1',
+          
+          // === Stability AI ===
+          'stability.stable-diffusion-xl-v1',
+          'stability.stable-image-ultra-v1:0',
+          'stability.stable-image-core-v1:0',
+          'stability.sd3-large-v1:0',
+          
+          // === Google ===
+          'google.gemini-2-0-flash-thinking-exp-v1:0',
+          
+          // === Qwen ===
+          'qwen.qwen2-5-72b-instruct-v1:0',
+          'qwen.qwen2-5-7b-instruct-v1:0',
+          
+          // === MiniMax ===
+          'minimax.abab6-5s-chat-v1:0',
+          'minimax.abab6-5g-chat-v1:0',
+          
+          // === Moonshot AI ===
+          'moonshot.moonshot-v1-8k',
+          'moonshot.moonshot-v1-32k',
+          'moonshot.moonshot-v1-128k',
+          
+          // === Z.AI (Zhipu AI) ===
+          'zai.glm-5',
+          'zai.glm-4-7',
+          'zai.glm-4-plus',
+          'zai.glm-4-air',
+          'zai.glm-4-flash',
+        ];
+        renderModelCombo(bedrockModels, $('#pf-model')?.value);
+      } else if (type === 'azure_foundry') {
+        // Azure AI Foundry: show Azure fields, hide Base URL and AWS fields
+        pfBaseUrlField.style.display = 'none';
+        if (pfAwsBedrockFields) pfAwsBedrockFields.style.display = 'none';
+        if (pfAzureFoundryFields) pfAzureFoundryFields.style.display = '';
+        
+        // Save current Base URL if it was custom
+        if (pfBaseUrlInput.value && pfBaseUrlInput.value.trim() !== '') {
+          lastCustomOpenAIUrl = pfBaseUrlInput.value;
+        }
+        pfBaseUrlInput.value = '';
+        
+        // Set default API version if not already set
+        const azureApiVersionInput = $('#pf-azure-api-version');
+        if (azureApiVersionInput && !azureApiVersionInput.value) {
+          azureApiVersionInput.value = '2024-05-01-preview';
+        }
+        
+        // Populate Azure AI Foundry model suggestions
+        const azureModels = [
+          // === OpenAI GPT Models ===
+          'gpt-4o', 'gpt-4o-mini', 'gpt-4', 'gpt-4-turbo', 'gpt-4-turbo-preview',
+          'gpt-35-turbo', 'gpt-35-turbo-16k',
+          // === OpenAI o-series Reasoning ===
+          'o1', 'o1-mini', 'o1-preview', 'o3', 'o3-mini', 'o4-mini',
+          // === Microsoft Phi ===
+          'Phi-4', 'Phi-4-mini-instruct', 'Phi-3.5-MoE-instruct',
+          'Phi-3.5-mini-instruct', 'Phi-3-medium-128k-instruct', 'Phi-3-small-128k-instruct',
+          // === Meta Llama ===
+          'Meta-Llama-3-1-405B-Instruct', 'Meta-Llama-3-1-70B-Instruct',
+          'Meta-Llama-3-1-8B-Instruct', 'Meta-Llama-3-70B-Instruct', 'Meta-Llama-3-8B-Instruct',
+          'Llama-3.3-70B-Instruct', 'Llama-3.2-90B-Vision-Instruct', 'Llama-3.2-11B-Vision-Instruct',
+          // === Mistral ===
+          'Mistral-large-2411', 'Mistral-large', 'Mistral-small',
+          'Mistral-NeMo', 'Codestral-2501',
+          // === DeepSeek ===
+          'DeepSeek-R1', 'DeepSeek-R1-0528', 'DeepSeek-V3-0324',
+          // === Cohere ===
+          'Cohere-command-r-plus-08-2024', 'Cohere-command-r-08-2024',
+          'Cohere-command-r-plus', 'Cohere-command-r',
+          // === AI21 ===
+          'jamba-1-5-large', 'jamba-1-5-mini',
+          // === JAIS ===
+          'jais-30b-chat',
+        ];
+        renderModelCombo(azureModels, $('#pf-model')?.value);
+      } else {
+        // Built-in providers and Databricks: hide all custom fields
+        pfBaseUrlField.style.display = 'none';
+        if (pfAwsBedrockFields) pfAwsBedrockFields.style.display = 'none';
+        if (pfAzureFoundryFields) pfAzureFoundryFields.style.display = 'none';
+        
+        // Save current Base URL if it was custom before hiding
+        if (pfBaseUrlInput.value && pfBaseUrlInput.value.trim() !== '') {
+          lastCustomOpenAIUrl = pfBaseUrlInput.value;
+        }
+        
+        // Clear field so it doesn't interfere
+        pfBaseUrlInput.value = '';
+      }
+    });
+    
+    // Validate Base URL on blur
+    if (pfBaseUrlInput) {
+      pfBaseUrlInput.addEventListener('blur', () => {
+        const type = pfTypeInput.value;
+        if (type !== 'openai-compatible') return; // Only validate for OpenAI Compatible
+        
+        const url = pfBaseUrlInput.value.trim();
+        if (!url) {
+          if (pfBaseUrlError) {
+            pfBaseUrlError.textContent = 'Base URL is required for OpenAI Compatible providers.';
+            pfBaseUrlError.style.display = 'block';
+          }
+          return;
+        }
+        
+        if (!/^https?:\/\//i.test(url)) {
+          if (pfBaseUrlError) {
+            pfBaseUrlError.textContent = 'Base URL must start with http:// or https://';
+            pfBaseUrlError.style.display = 'block';
+          }
+          return;
+        }
+        
+        // Clear error if valid
+        if (pfBaseUrlError) {
+          pfBaseUrlError.style.display = 'none';
+          pfBaseUrlError.textContent = '';
+        }
+      });
+      
+      // Clear error on input
+      pfBaseUrlInput.addEventListener('input', () => {
+        if (pfBaseUrlError) {
+          pfBaseUrlError.style.display = 'none';
+        }
+      });
+    }
   }
 
   // ── Model combo dropdown helpers ─────────────────────────────
@@ -4548,30 +5462,402 @@
   const pfTestBtn = $('#pf-test-btn');
   if (pfTestBtn) {
     pfTestBtn.addEventListener('click', async () => {
+      console.log('Test Connection button clicked');
       const id = $('#provider-modal-id')?.value?.trim();
       const result = $('#pf-test-result');
       if (!result) return;
 
-      const baseUrl = $('#pf-baseurl')?.value?.trim();
-      const apiKey  = $('#pf-apikey')?.value?.trim();
-      const modelInput = $('#pf-model');
-
-      if (!baseUrl) { toast('Enter a Base URL first.', 'warn'); return; }
-
-      pfTestBtn.disabled = true;
-      result.textContent = 'Fetching models…';
-      result.className = 'pf-test-result loading';
-
-      const effectiveKey = apiKey;
-
-      // ── Fetch /models ──────────────────────────────────────────
-      // This is the primary connectivity proof: if /models responds with a
-      // non-empty list the key and URL are valid.  No need to also hit
-      // /chat/completions (which requires knowing a valid model name).
-      let fetchedModels = [];
-      let modelsOk = false;
+      const type = $('#pf-type')?.value?.trim() || 'openai-compatible';
+      console.log('Provider type:', type);
+      
+      // Declare all variables at the top
+      let baseUrl = '';
       let modelsError = '';
       let latencyMs = 0;
+      
+      const apiKey = $('#pf-apikey')?.value?.trim();
+      const modelInput = $('#pf-model');
+
+      pfTestBtn.disabled = true;
+      result.textContent = 'Testing connection…';
+      result.className = 'pf-test-result loading';
+      
+      if (type === 'openai-compatible') {
+        // Use the entered Base URL
+        baseUrl = $('#pf-baseurl')?.value?.trim();
+        if (!baseUrl) {
+          toast('Enter a Base URL first.', 'warn');
+          pfTestBtn.disabled = false;
+          return;
+        }
+        
+        if (!/^https?:\/\//i.test(baseUrl)) {
+          toast('Base URL must start with http:// or https://', 'error');
+          pfTestBtn.disabled = false;
+          return;
+        }
+        
+        // Remove trailing slash
+        baseUrl = baseUrl.replace(/\/+$/, '');
+        
+      } else if (type === 'aws_bedrock') {
+        // AWS Bedrock: validate required fields
+        const awsRegion = $('#pf-aws-region')?.value?.trim();
+        const testKey = apiKey;
+        
+        if (!awsRegion) {
+          toast('Select an AWS Region to test the connection.', 'warn');
+          pfTestBtn.disabled = false;
+          return;
+        }
+        
+        if (!testKey && !id) {
+          toast('Enter Amazon Bedrock API Key to test the connection.', 'warn');
+          pfTestBtn.disabled = false;
+          return;
+        }
+        
+        const testModel = $('#pf-model')?.value?.trim();
+        if (!testModel) {
+          toast('Enter a Model ID to test the connection (e.g., anthropic.claude-sonnet-4-5-20250929-v1:0)', 'warn');
+          pfTestBtn.disabled = false;
+          return;
+        }
+        
+        // Use backend test endpoint
+        if (id) {
+          try {
+            const start = Date.now();
+            const testData = await api('POST', `/providers/${id}/test`);
+            latencyMs = Date.now() - start;
+            if (testData.success) {
+              result.textContent = `✓ ${testData.latencyMs}ms · ${testData.message || 'Connection OK'}`;
+              result.className = 'pf-test-result ok';
+              pfTestBtn.disabled = false;
+              return;
+            } else {
+              result.textContent = `✗ ${testData.error || 'Connection failed'}`;
+              result.className = 'pf-test-result err';
+              pfTestBtn.disabled = false;
+              return;
+            }
+          } catch (err) {
+            const modelsError = err.message || 'Connection test failed';
+            result.textContent = `✗ ${modelsError}`;
+            result.className = 'pf-test-result err';
+            pfTestBtn.disabled = false;
+            return;
+          }
+        } else {
+          // For new providers, need to save first before testing
+          toast('Save the provider first, then test the connection.', 'info');
+          pfTestBtn.disabled = false;
+          return;
+        }
+        
+      } else if (type === 'databricks') {
+        // Databricks: use fixed base URL
+        baseUrl = 'https://dbc-def4da34-c29a.cloud.databricks.com/ai-gateway/mlflow/v1';
+        
+        // Databricks /models endpoint may not work the same way as OpenAI
+        // Use the backend test endpoint instead which tests /chat/completions
+        if (id) {
+          // Use backend endpoint for existing provider
+          try {
+            const start = Date.now();
+            const testData = await api('POST', `/providers/${id}/test`);
+            latencyMs = Date.now() - start;
+            if (testData.success) {
+              result.textContent = `✓ ${testData.latencyMs}ms · Connection OK`;
+              result.className = 'pf-test-result ok';
+              pfTestBtn.disabled = false;
+              return;
+            } else {
+              result.textContent = `✗ Connection failed`;
+              result.className = 'pf-test-result err';
+              pfTestBtn.disabled = false;
+              return;
+            }
+          } catch (err) {
+            modelsError = err.message || 'Connection test failed';
+            result.textContent = `✗ ${modelsError}`;
+            result.className = 'pf-test-result err';
+            pfTestBtn.disabled = false;
+            return;
+          }
+        } else {
+          // For new Databricks providers, we need a model and API key to test
+          const testModel = $('#pf-model')?.value?.trim();
+          const testKey = apiKey;
+          
+          if (!testKey) {
+            toast('Enter an API Key to test the connection.', 'warn');
+            pfTestBtn.disabled = false;
+            return;
+          }
+          
+          if (!testModel) {
+            toast('Enter a Model ID to test the connection (e.g., system.ai.glm-5-2)', 'warn');
+            pfTestBtn.disabled = false;
+            return;
+          }
+          
+          // Test with a minimal chat completion request
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 15000);
+            const start = Date.now();
+            const r = await fetch(`${baseUrl}/chat/completions`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                Authorization: `Bearer ${testKey}`,
+              },
+              body: JSON.stringify({
+                model: testModel,
+                messages: [{ role: 'user', content: 'Hi' }],
+                max_completion_tokens: 5
+              }),
+              signal: controller.signal,
+            });
+            clearTimeout(timer);
+            latencyMs = Date.now() - start;
+
+            if (r.ok) {
+              result.textContent = `✓ ${latencyMs}ms · Connection OK`;
+              result.className = 'pf-test-result ok';
+              pfTestBtn.disabled = false;
+              return;
+            } else {
+              const body = await r.json().catch(() => ({}));
+              const msg = body?.error?.message || body?.error || `HTTP ${r.status}`;
+              modelsError = `${r.status}: ${typeof msg === 'string' ? msg.slice(0, 150) : JSON.stringify(msg).slice(0, 150)}`;
+              result.textContent = `✗ ${modelsError}`;
+              result.className = 'pf-test-result err';
+              pfTestBtn.disabled = false;
+              return;
+            }
+          } catch (err) {
+            modelsError = err.name === 'AbortError' ? 'Timeout after 15s' : err.message;
+            result.textContent = `✗ ${modelsError}`;
+            result.className = 'pf-test-result err';
+            pfTestBtn.disabled = false;
+            return;
+          }
+        }
+        
+      } else if (type === 'azure_foundry') {
+        // Azure AI Foundry: validate endpoint + api-version, then test
+        const azureEndpoint = $('#pf-azure-endpoint')?.value?.trim();
+        const azureApiVersion = $('#pf-azure-api-version')?.value?.trim() || '2024-05-01-preview';
+        const azureApiFlavor = $('#pf-azure-api-flavor')?.value || 'chat_completions';
+        const testKey = apiKey;
+        
+        if (!azureEndpoint) {
+          toast('Enter an Endpoint URL to test the connection.', 'warn');
+          pfTestBtn.disabled = false;
+          return;
+        }
+        
+        if (!/^https?:\/\//i.test(azureEndpoint)) {
+          toast('Endpoint URL must start with https://', 'error');
+          pfTestBtn.disabled = false;
+          return;
+        }
+        
+        if (!testKey && !id) {
+          toast('Enter an API Key to test the connection.', 'warn');
+          pfTestBtn.disabled = false;
+          return;
+        }
+        
+        const testModel = $('#pf-model')?.value?.trim();
+        if (!testModel) {
+          toast('Enter a Default Model to test (e.g., gpt-4o)', 'warn');
+          pfTestBtn.disabled = false;
+          return;
+        }
+        
+        // For existing providers, use the backend test endpoint
+        if (id) {
+          try {
+            const start = Date.now();
+            const testData = await api('POST', `/providers/${id}/test`);
+            latencyMs = Date.now() - start;
+            if (testData.success) {
+              result.textContent = `✓ ${testData.latencyMs}ms · Azure AI Foundry OK`;
+              result.className = 'pf-test-result ok';
+              pfTestBtn.disabled = false;
+              return;
+            } else {
+              result.textContent = `✗ ${testData.error || 'Connection failed'}`;
+              result.className = 'pf-test-result err';
+              pfTestBtn.disabled = false;
+              return;
+            }
+          } catch (err) {
+            result.textContent = `✗ ${err.message || 'Connection test failed'}`;
+            result.className = 'pf-test-result err';
+            pfTestBtn.disabled = false;
+            return;
+          }
+        } else {
+          // New provider: test directly
+          // Normalize the endpoint — strip any trailing API path segments
+          // so we can construct the correct /chat/completions URL
+          function normalizeAzureBase(url) {
+            let base = url.replace(/\/+$/, '');
+            // Strip common Azure path suffixes that users might accidentally include
+            const suffixes = [
+              '/chat/completions', '/completions', '/embeddings',
+              '/responses', '/models/chat/completions',
+              '/models', '/openai/v1', '/openai',
+            ];
+            let changed = true;
+            while (changed) {
+              changed = false;
+              for (const s of suffixes) {
+                if (base.endsWith(s)) {
+                  base = base.slice(0, -s.length);
+                  changed = true;
+                  break;
+                }
+              }
+            }
+            return base;
+          }
+
+          const resourceBase = normalizeAzureBase(azureEndpoint);
+
+          // Try URL formats in order of preference for Azure AI Foundry:
+          const isResponses = azureApiFlavor === 'responses';
+          let urlCandidates = [];
+          
+          if (isResponses) {
+            urlCandidates = [
+              `${resourceBase}/openai/v1/responses?api-version=${azureApiVersion}`,
+              `${resourceBase}/v1/responses?api-version=${azureApiVersion}`,
+              `${resourceBase}/responses?api-version=${azureApiVersion}`,
+              // Some standard OpenAI-compatible endpoints might not need api-version
+              `${resourceBase}/openai/v1/responses`,
+            ];
+          } else {
+            urlCandidates = [
+              `${resourceBase}/models/chat/completions?api-version=${azureApiVersion}`,
+              `${resourceBase}/openai/v1/chat/completions?api-version=${azureApiVersion}`,
+              `${resourceBase}/chat/completions?api-version=${azureApiVersion}`,
+              `${resourceBase}/openai/deployments/${testModel}/chat/completions?api-version=${azureApiVersion}`
+            ];
+          }
+
+          let lastStatus = 0;
+          let lastMsg = 'No response';
+          let succeeded = false;
+
+          for (const chatUrl of urlCandidates) {
+            try {
+              const controller = new AbortController();
+              const timer = setTimeout(() => controller.abort(), 12000);
+              const start = Date.now();
+              const effectiveKey = testKey;
+              const reqBody = isResponses ? {
+                model: testModel,
+                input: "Hi",
+              } : {
+                model: testModel,
+                messages: [{ role: 'user', content: 'Hi' }],
+                max_completion_tokens: 5,
+              };
+
+              const r = await fetch(chatUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Accept: 'application/json',
+                  Authorization: `Bearer ${effectiveKey}`,
+                  'api-key': effectiveKey, // Azure also accepts api-key header
+                },
+                body: JSON.stringify(reqBody),
+                signal: controller.signal,
+              });
+              clearTimeout(timer);
+              latencyMs = Date.now() - start;
+              lastStatus = r.status;
+
+              if (r.ok) {
+                // Update the input field with the correctly resolved base URL
+                let resolvedBase = resourceBase;
+                if (chatUrl.includes('/models/chat/completions')) resolvedBase = `${resourceBase}/models`;
+                else if (chatUrl.includes('/openai/v1/chat/completions') || chatUrl.includes('/openai/v1/responses')) resolvedBase = `${resourceBase}/openai/v1`;
+                else if (chatUrl.includes('/v1/responses')) resolvedBase = `${resourceBase}/v1`;
+                else if (chatUrl.includes('/openai/deployments/')) resolvedBase = `${resourceBase}/openai/deployments/${testModel}`;
+                document.getElementById('pf-azure-endpoint').value = resolvedBase;
+                
+                result.textContent = `✓ ${latencyMs}ms · Azure AI Foundry OK`;
+                result.className = 'pf-test-result ok';
+                pfTestBtn.disabled = false;
+                succeeded = true;
+                return;
+              } else {
+                const body = await r.json().catch(() => ({}));
+                const msg = body?.error?.message || body?.error?.code || `HTTP ${r.status}`;
+                lastMsg = typeof msg === 'string' ? msg.slice(0, 200) : JSON.stringify(msg).slice(0, 200);
+
+                // 401/403 = auth error — server reached, wrong key
+                // Stop trying other URLs since it's an auth issue not a routing issue
+                if (r.status === 401 || r.status === 403) {
+                  result.textContent = `✗ ${r.status}: ${lastMsg}`;
+                  result.className = 'pf-test-result err';
+                  pfTestBtn.disabled = false;
+                  return;
+                }
+
+                // 404/400 with routing error = wrong URL format, try next candidate
+                // Otherwise stop
+                if (r.status !== 404 && r.status !== 400) {
+                  break;
+                }
+              }
+            } catch (err) {
+              if (err.name === 'AbortError') {
+                lastMsg = 'Timeout after 12s';
+                break;
+              }
+              lastMsg = err.message;
+              // Network error — no point trying other URL formats
+              break;
+            }
+          }
+
+          if (!succeeded) {
+            result.textContent = `✗ ${lastStatus ? lastStatus + ': ' : ''}${lastMsg}`;
+            result.className = 'pf-test-result err';
+            pfTestBtn.disabled = false;
+          }
+          return;
+        }
+        
+      } else {
+        // Built-in providers: cannot test from modal without baseUrl
+        toast('Testing built-in providers requires activation first.', 'info');
+        pfTestBtn.disabled = false;
+        return;
+      }
+
+      // ── Fetch /models ──────────────────────────────────────────
+      // Primary connectivity proof. Some providers (e.g. Azure OpenAI) don't
+      // expose /models — in that case fall back to a /chat/completions probe.
+      let fetchedModels = [];
+      let modelsOk = false;
+      let usedChatFallback = false;
+
+      // Helper: check if an error body looks like an Azure routing error
+      // (i.e. the endpoint doesn't support /models and treats 'models' as an ID)
+      function isAzureRoutingError(body) {
+        const msg = JSON.stringify(body || '').toLowerCase();
+        return msg.includes('response_id') || msg.includes('begins with') || msg.includes("'resp'");
+      }
 
       if (id && !apiKey) {
         // Editing provider with unchanged key — use backend endpoint
@@ -4614,9 +5900,59 @@
               .filter((x) => typeof x === 'string' && x.length > 0);
             modelsOk = true;
           } else {
-            const body = await r.json().catch(() => ({}));
-            const msg = body?.error?.message || body?.error || `HTTP ${r.status}`;
+            const errBody = await r.json().catch(() => ({}));
+            const msg = errBody?.error?.message || errBody?.error || `HTTP ${r.status}`;
             modelsError = `${r.status}: ${typeof msg === 'string' ? msg.slice(0, 150) : JSON.stringify(msg).slice(0, 150)}`;
+
+            // ── Fallback: /models not supported (e.g. Azure OpenAI) ──
+            // Try /chat/completions instead if we have a model name
+            if (isAzureRoutingError(errBody) || r.status === 404 || r.status === 400) {
+              const fallbackModel = modelInput?.value?.trim();
+              if (fallbackModel) {
+                try {
+                  const ctrl2 = new AbortController();
+                  const t2 = setTimeout(() => ctrl2.abort(), 15000);
+                  const start2 = Date.now();
+                  const r2 = await fetch(`${baseUrl}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Accept: 'application/json',
+                      ...(effectiveKey ? { Authorization: `Bearer ${effectiveKey}` } : {}),
+                    },
+                    body: JSON.stringify({
+                      model: fallbackModel,
+                      messages: [{ role: 'user', content: 'Hi' }],
+                      max_completion_tokens: 5,
+                    }),
+                    signal: ctrl2.signal,
+                  });
+                  clearTimeout(t2);
+                  latencyMs = Date.now() - start2;
+                  if (r2.ok || r2.status === 400 /* bad request still means server reached */) {
+                    modelsOk = true;
+                    usedChatFallback = true;
+                    modelsError = '';
+                    if (!r2.ok) {
+                      // 400 from /chat/completions = server is reachable but model/params wrong
+                      const b2 = await r2.json().catch(() => ({}));
+                      const m2 = b2?.error?.message || '';
+                      // Only count as ok if it's NOT an auth failure
+                      if (r2.status === 401 || m2.toLowerCase().includes('auth') || m2.toLowerCase().includes('api key')) {
+                        modelsOk = false;
+                        modelsError = `Auth error: ${m2.slice(0, 150)}`;
+                      }
+                    }
+                  } else {
+                    const b2 = await r2.json().catch(() => ({}));
+                    const m2 = b2?.error?.message || b2?.error?.code || `HTTP ${r2.status}`;
+                    modelsError = `${r2.status}: ${typeof m2 === 'string' ? m2.slice(0, 150) : JSON.stringify(m2).slice(0, 150)}`;
+                  }
+                } catch (fallbackErr) {
+                  // Keep original modelsError
+                }
+              }
+            }
           }
         } catch (err) {
           modelsError = err.name === 'AbortError' ? 'Timeout after 15s' : err.message;
@@ -4631,13 +5967,27 @@
         return;
       }
 
-      if (fetchedModels.length > 0) {
+      if (usedChatFallback) {
+        // /models not available (Azure-style endpoint) — connected via /chat/completions
+        result.textContent = `✓ ${latencyMs}ms · Connected (Azure-compatible endpoint)`;
+        result.className = 'pf-test-result ok';
+      } else if (fetchedModels.length > 0) {
         result.textContent = `✓ ${latencyMs}ms · ${fetchedModels.length} models`;
         result.className = 'pf-test-result ok';
 
         // Pre-fill model field with first model if still empty
         if (modelInput && !modelInput.value.trim()) {
           modelInput.value = fetchedModels[0];
+        }
+
+        const availModelsInp = $('#pf-available-models');
+        if (availModelsInp) {
+          availModelsInp.value = fetchedModels.join(', ');
+          const countHint = $('#pf-models-count-hint');
+          if (countHint) {
+            countHint.textContent = `✓ ${fetchedModels.length} models fetched and loaded. Click "Save Provider" to store them.`;
+            countHint.style.color = 'var(--ok)';
+          }
         }
 
         renderModelCombo(fetchedModels, modelInput?.value);
@@ -4652,19 +6002,225 @@
     });
   }
 
+  // ── Fetch Models for Provider Form (⚡ Fetch Models button) ─────
+  const pfFetchBtn = $('#pf-fetch-models-btn');
+  if (pfFetchBtn) {
+    pfFetchBtn.addEventListener('click', async () => {
+      const id = $('#provider-modal-id')?.value?.trim();
+      const type = $('#pf-type')?.value?.trim() || 'openai-compatible';
+      const modelInput = $('#pf-model');
+      const availModelsInp = $('#pf-available-models');
+      const countHint = $('#pf-models-count-hint');
+      const testResult = $('#pf-test-result');
+
+      let baseUrl = '';
+      if (type === 'openai-compatible') {
+        baseUrl = $('#pf-baseurl')?.value?.trim();
+      } else if (type === 'azure_foundry') {
+        baseUrl = $('#pf-azure-endpoint')?.value?.trim();
+      }
+
+      const apiKey = $('#pf-apikey')?.value?.trim();
+
+      pfFetchBtn.disabled = true;
+      pfFetchBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="animation:spin 1s linear infinite;width:12px;height:12px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg> Fetching…';
+
+      try {
+        let fetchedModels = [];
+        let latencyMs = 0;
+
+        if (id && !apiKey) {
+          // Saved provider with unchanged key — use backend sync
+          const start = Date.now();
+          const data = await api('POST', `/providers/${id}/sync-models`);
+          latencyMs = Date.now() - start;
+          fetchedModels = data.models || [];
+        } else {
+          // Direct fetch
+          if (!baseUrl) {
+            toast('Please enter the Base URL first.', 'error');
+            return;
+          }
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 15000);
+          const start = Date.now();
+          const r = await fetch(`${baseUrl.replace(/\/+$/, '')}/models`, {
+            method: 'GET',
+            headers: {
+              Accept: 'application/json',
+              ...(apiKey ? { Authorization: `Bearer ${apiKey}`, 'api-key': apiKey } : {}),
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timer);
+          latencyMs = Date.now() - start;
+          if (r.ok) {
+            const data = await r.json().catch(() => ({}));
+            const arr = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+            fetchedModels = arr.map((m) => (typeof m === 'string' ? m : m?.id)).filter((x) => typeof x === 'string' && x.length > 0);
+          } else {
+            const errBody = await r.json().catch(() => ({}));
+            const msg = errBody?.error?.message || `HTTP ${r.status}`;
+            throw new Error(`Upstream returned ${msg}`);
+          }
+        }
+
+        if (fetchedModels.length > 0) {
+          if (availModelsInp) {
+            availModelsInp.value = fetchedModels.join(', ');
+          }
+          if (countHint) {
+            countHint.textContent = `✓ ${fetchedModels.length} models fetched from provider in ${latencyMs}ms.`;
+            countHint.style.color = 'var(--ok)';
+          }
+          if (modelInput && !modelInput.value.trim()) {
+            modelInput.value = fetchedModels[0];
+          }
+          if (testResult) {
+            testResult.textContent = `✓ ${latencyMs}ms · ${fetchedModels.length} models`;
+            testResult.className = 'pf-test-result ok';
+          }
+          renderModelCombo(fetchedModels, modelInput?.value);
+          toast(`Fetched ${fetchedModels.length} models from provider. Click "Save Provider" to store them.`, 'ok', 'Models Fetched');
+        } else {
+          toast('Connected to provider, but no models were returned by /models endpoint.', 'info', 'No Models Listed');
+        }
+      } catch (err) {
+        toast(err.message || 'Failed to fetch models from provider.', 'error', 'Fetch Failed');
+        if (countHint) {
+          countHint.textContent = `Failed to fetch: ${err.message}`;
+          countHint.style.color = 'var(--danger)';
+        }
+      } finally {
+        pfFetchBtn.disabled = false;
+        pfFetchBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg> ⚡ Fetch Models';
+      }
+    });
+  }
+
   // ── Save Provider (Add/Edit) ──────────────────────────────────
 
   const pfSaveBtn = $('#pf-save-btn');
   if (pfSaveBtn) {
     pfSaveBtn.addEventListener('click', async () => {
       const id = $('#provider-modal-id')?.value?.trim();
+      const type = $('#pf-type')?.value?.trim() || 'openai-compatible';
+      const urlError = $('#pf-baseurl-error');
+      
+      let baseUrl = '';
+      
+      // Prepare body object
       const body = {
         name: $('#pf-name')?.value?.trim(),
-        baseUrl: $('#pf-baseurl')?.value?.trim(),
+        type: type,
+        baseUrl: '',
         apiKey: $('#pf-apikey')?.value?.trim(),
         defaultModel: $('#pf-model')?.value?.trim(),
         notes: $('#pf-notes')?.value?.trim() || '',
       };
+
+      const modelsRaw = $('#pf-available-models')?.value?.trim();
+      if (modelsRaw !== undefined) {
+        body.models = modelsRaw
+          ? modelsRaw.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean)
+          : [];
+      }
+      
+      // ── Frontend validation (common fields) ───────────────────
+      if (!body.name) {
+        toast('Provider Name is required — enter a name at the top of the form.', 'error');
+        const modalBody = document.querySelector('#provider-modal .modal-body');
+        if (modalBody) modalBody.scrollTop = 0;
+        setTimeout(() => $('#pf-name')?.focus(), 50);
+        return;
+      }
+      if (!body.defaultModel) {
+        toast('Default Model is required.', 'error');
+        $('#pf-model')?.focus();
+        return;
+      }
+      
+      if (type === 'openai-compatible') {
+        // OpenAI Compatible: use the entered Base URL
+        baseUrl = $('#pf-baseurl')?.value?.trim();
+        
+        if (!baseUrl) {
+          if (urlError) {
+            urlError.textContent = 'Base URL is required for OpenAI Compatible providers.';
+            urlError.style.display = 'block';
+          }
+          toast('Base URL is required.', 'error');
+          return;
+        }
+        
+        if (!/^https?:\/\//i.test(baseUrl)) {
+          if (urlError) {
+            urlError.textContent = 'Base URL must start with http:// or https://';
+            urlError.style.display = 'block';
+          }
+          toast('Invalid Base URL format.', 'error');
+          return;
+        }
+        
+        // Remove trailing slash to avoid duplicate paths
+        baseUrl = baseUrl.replace(/\/+$/, '');
+        body.baseUrl = baseUrl;
+        
+      } else if (type === 'aws_bedrock') {
+        // AWS Bedrock: collect AWS-specific fields
+        const awsRegion = $('#pf-aws-region')?.value?.trim();
+        
+        if (!awsRegion) {
+          toast('AWS Region is required for AWS Bedrock.', 'error');
+          return;
+        }
+        
+        if (!body.apiKey && !id) {
+          toast('Amazon Bedrock API Key is required for AWS Bedrock.', 'error');
+          return;
+        }
+        
+        // Add AWS Region to body
+        body.awsRegion = awsRegion;
+        body.baseUrl = ''; // AWS Bedrock doesn't use baseUrl (backend constructs endpoint from region)
+        
+      } else if (type === 'databricks') {
+        // Databricks: use fixed base URL (backend will handle this)
+        baseUrl = 'https://dbc-def4da34-c29a.cloud.databricks.com/ai-gateway/mlflow/v1';
+        body.baseUrl = baseUrl;
+        
+      } else if (type === 'azure_foundry') {
+        // Azure AI Foundry: collect endpoint URL and API version
+        const azureEndpoint = $('#pf-azure-endpoint')?.value?.trim();
+        const azureApiVersion = $('#pf-azure-api-version')?.value?.trim() || '2024-05-01-preview';
+        const azureApiFlavor = $('#pf-azure-api-flavor')?.value || 'chat_completions';
+        
+        if (!azureEndpoint) {
+          toast('Endpoint URL is required for Azure AI Foundry.', 'error');
+          return;
+        }
+        
+        if (!/^https?:\/\//i.test(azureEndpoint)) {
+          toast('Endpoint URL must start with https://', 'error');
+          return;
+        }
+        
+        body.baseUrl = azureEndpoint.replace(/\/+$/, '');
+        body.azureApiVersion = azureApiVersion;
+        body.azureApiFlavor = azureApiFlavor;
+        
+      } else {
+        // Built-in providers: set baseUrl to empty or use predefined endpoints
+        // The backend will handle routing to the correct built-in provider
+        baseUrl = ''; // Built-in providers don't need custom base URLs
+        body.baseUrl = baseUrl;
+      }
+      
+      // Clear any URL errors
+      if (urlError) {
+        urlError.style.display = 'none';
+        urlError.textContent = '';
+      }
 
       pfSaveBtn.disabled = true;
       pfSaveBtn.textContent = 'Saving…';
@@ -4676,6 +6232,13 @@
           const idx = providerState.providers.findIndex((p) => p.id === id);
           if (idx >= 0) providerState.providers[idx] = snap;
           toast(`Provider "${snap.name}" updated.`, 'ok');
+          if (providerState.activeId === id) {
+            state.activeProvider = snap;
+            state.availableModels = snap.models || [];
+            if (typeof loadMappings === 'function') {
+              await loadMappings();
+            }
+          }
         } else {
           snap = await api('POST', '/providers', body);
           providerState.providers.push(snap);
@@ -4684,6 +6247,7 @@
         closeProviderModalWithReset();
         renderActiveBanner();
         renderProviderCards();
+        loadConfig();
       } catch (err) {
         toast(err.message || 'Save failed.', 'error');
       } finally {
@@ -4756,20 +6320,19 @@
             renderActiveBanner();
             renderProviderCards();
             loadConfig();
-            if (data.restored) {
-              if (typeof loadMappings === 'function') await loadMappings();
-              const p = providerState.providers.find((x) => x.id === id);
-              toast(`Switched to ${p?.name || 'provider'}. Your saved mappings have been restored.`, 'ok', 'Provider Restored');
-            } else {
-              const p = providerState.providers.find((x) => x.id === id);
-              toast(`Switched to ${p?.name || 'provider'}. Syncing mappings…`, 'ok', 'Provider Switched');
-              setTimeout(async () => {
-                if (typeof loadMappings === 'function') {
-                  await loadMappings();
-                  toast('Model Router updated to new provider.', 'ok', 'Mappings Updated');
-                }
-              }, 2500);
+            if (typeof loadMappings === 'function') {
+              await loadMappings();
             }
+            const p = providerState.providers.find((x) => x.id === id);
+            const targetModel = data.target || p?.defaultModel;
+            const msgSuffix = data.restored
+              ? ' · Restored saved model mappings'
+              : (targetModel ? ` · Model Router updated to ${escapeHtml(targetModel)}` : '');
+            toast(
+              `Switched to ${p?.name || 'provider'}${msgSuffix}`,
+              'ok',
+              data.restored ? 'Provider Restored' : 'Provider Switched',
+            );
           } catch (err) {
             toast(err.message || 'Failed to switch.', 'error');
           }
@@ -4788,6 +6351,9 @@
             renderProviderCards();
             toast('Reverted to .env defaults.', 'info');
             loadConfig();
+            if (typeof loadMappings === 'function') {
+              await loadMappings();
+            }
           } catch (err) {
             toast(err.message || 'Failed.', 'error');
           }
@@ -5167,6 +6733,231 @@
   });
 
   /* ══════════════════════════════════════════════════════════════════
+     SECTION 26b — Gateway API Keys & Integrations Page
+     ══════════════════════════════════════════════════════════════════ */
+  let currentSetupData = null;
+  let activeSnippetTab = 'python';
+
+  async function loadApiKeysPage() {
+    try {
+      const [keysData, setupData] = await Promise.all([
+        api('GET', '/gateway-keys'),
+        api('GET', '/gateway-setup'),
+      ]);
+
+      currentSetupData = setupData;
+
+      // Populate base URLs
+      const cdUrlEl = $('#cd-base-url');
+      if (cdUrlEl) cdUrlEl.value = keysData.anthropicBaseUrl || keysData.proxyBaseUrl;
+
+      const oaUrlEl = $('#openai-base-url');
+      if (oaUrlEl) oaUrlEl.value = keysData.openaiBaseUrl;
+
+      // Find active key
+      const activeKey = keysData.keys.find((k) => !k.revoked);
+      const cdKeyEl = $('#cd-api-key');
+      if (cdKeyEl) {
+        cdKeyEl.value = activeKey ? activeKey.keyPreview : (keysData.masterKeySet ? 'Master Key configured' : 'No active keys');
+      }
+
+      // Render code snippets
+      renderSnippet(activeSnippetTab);
+
+      // Update key count badge
+      const countBadge = $('#gateway-keys-count-badge');
+      if (countBadge) {
+        countBadge.textContent = `${keysData.activeCount} Active / ${keysData.totalCount} Total`;
+      }
+
+      // Render keys table
+      renderKeysTable(keysData.keys);
+
+    } catch (err) {
+      toast(`Failed to load API keys: ${err.message}`, 'error');
+    }
+  }
+
+  function renderSnippet(lang) {
+    activeSnippetTab = lang;
+    const pre = $('#openai-code-pre');
+    if (!pre || !currentSetupData) return;
+
+    const tabs = $$('#code-snippet-tabs button');
+    tabs.forEach((t) => {
+      const isAct = t.getAttribute('data-snippet') === lang;
+      t.className = isAct ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
+    });
+
+    if (lang === 'python') {
+      pre.textContent = currentSetupData.openaiCompatible.pythonSnippet;
+    } else if (lang === 'node') {
+      pre.textContent = currentSetupData.openaiCompatible.nodeSnippet;
+    } else if (lang === 'curl') {
+      pre.textContent = currentSetupData.openaiCompatible.curlSnippet;
+    }
+  }
+
+  function renderKeysTable(keys) {
+    const tbody = $('#gateway-keys-tbody');
+    if (!tbody) return;
+
+    if (!keys || keys.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No gateway API keys generated yet. Click "Create Gateway API Key" above to generate your first key.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = keys.map((k) => {
+      const statusBadge = k.revoked 
+        ? '<span class="badge badge-danger">Revoked</span>'
+        : '<span class="badge badge-success">Active</span>';
+
+      const lastUsedStr = k.lastUsedAt ? fmt.relativeTime(k.lastUsedAt) : 'Never';
+      const createdStr = fmt.relativeTime(k.createdAt);
+
+      return `<tr>
+        <td><strong style="color:var(--text);">${escapeHtml(k.name)}</strong></td>
+        <td><code style="font-size:12px;">${escapeHtml(k.keyPreview)}</code></td>
+        <td style="font-size:12px; color:var(--text-secondary);">${createdStr}</td>
+        <td style="font-size:12px; color:var(--text-secondary);">${lastUsedStr}</td>
+        <td>${statusBadge}</td>
+        <td style="text-align:right;">
+          <div style="display:inline-flex; gap:6px;">
+            ${!k.revoked ? `<button class="btn btn-outline-danger btn-sm" data-action="revoke-key" data-id="${escapeAttr(k.id)}" style="padding:2px 8px; font-size:11px;">Revoke</button>` : ''}
+            <button class="btn btn-outline btn-sm" data-action="delete-key" data-id="${escapeAttr(k.id)}" style="padding:2px 8px; font-size:11px;">Delete</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    // Wire up revoke and delete buttons
+    tbody.querySelectorAll('[data-action="revoke-key"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        if (!confirm('Are you sure you want to revoke this API key? Clients using it will be rejected.')) return;
+        try {
+          await api('POST', `/gateway-keys/${id}/revoke`);
+          toast('API key revoked', 'ok');
+          loadApiKeysPage();
+        } catch (err) {
+          toast(`Failed to revoke key: ${err.message}`, 'error');
+        }
+      });
+    });
+
+    tbody.querySelectorAll('[data-action="delete-key"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        if (!confirm('Are you sure you want to delete this API key permanently?')) return;
+        try {
+          await api('DELETE', `/gateway-keys/${id}`);
+          toast('API key deleted', 'ok');
+          loadApiKeysPage();
+        } catch (err) {
+          toast(`Failed to delete key: ${err.message}`, 'error');
+        }
+      });
+    });
+  }
+
+  // Modal open/close
+  function openKeyModal() {
+    const modal = $('#create-key-modal-overlay');
+    if (modal) {
+      modal.classList.remove('hidden');
+      const input = $('#new-key-name-input');
+      if (input) { input.value = ''; input.focus(); }
+    }
+  }
+
+  function closeKeyModal() {
+    const modal = $('#create-key-modal-overlay');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function initApiKeysModule() {
+    $('#btn-open-create-key')?.addEventListener('click', openKeyModal);
+    $('#btn-create-key-table')?.addEventListener('click', openKeyModal);
+    $('#create-key-modal-close')?.addEventListener('click', closeKeyModal);
+    $('#create-key-modal-cancel')?.addEventListener('click', closeKeyModal);
+    $('#create-key-modal-overlay')?.addEventListener('click', (e) => {
+      if (e.target.id === 'create-key-modal-overlay') closeKeyModal();
+    });
+
+    // Form submit
+    $('#create-key-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nameInput = $('#new-key-name-input');
+      const name = nameInput?.value.trim() || 'Default Key';
+      const expiresVal = parseInt($('#new-key-expiry-select')?.value, 10);
+      const expiresDays = expiresVal > 0 ? expiresVal : undefined;
+
+      const submitBtn = $('#create-key-modal-submit');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('btn-loading');
+      }
+
+      try {
+        const res = await api('POST', '/gateway-keys', { name, expiresDays });
+        closeKeyModal();
+        toast('New Gateway API Key created!', 'ok');
+
+        // Show banner with revealed key
+        const banner = $('#new-key-banner');
+        const valInput = $('#new-key-value');
+        if (banner && valInput) {
+          valInput.value = res.key;
+          banner.classList.remove('hidden');
+          banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        await loadApiKeysPage();
+      } catch (err) {
+        toast(`Failed to create key: ${err.message}`, 'error');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('btn-loading');
+        }
+      }
+    });
+
+    // Dismiss revealed key banner
+    $('#btn-dismiss-new-key')?.addEventListener('click', () => {
+      $('#new-key-banner')?.classList.add('hidden');
+    });
+
+    // Copy handlers
+    function copyText(txt, label) {
+      if (!txt) return;
+      navigator.clipboard.writeText(txt).then(() => {
+        toast(`${label} copied to clipboard!`, 'ok');
+      }).catch(() => {
+        toast(`Failed to copy to clipboard`, 'error');
+      });
+    }
+
+    $('#btn-copy-new-key')?.addEventListener('click', () => copyText($('#new-key-value')?.value, 'API Key'));
+    $('#btn-copy-cd-url')?.addEventListener('click', () => copyText($('#cd-base-url')?.value, 'Claude Desktop Gateway URL'));
+    $('#btn-copy-cd-key')?.addEventListener('click', () => copyText($('#cd-api-key')?.value, 'API Key'));
+    $('#btn-copy-openai-url')?.addEventListener('click', () => copyText($('#openai-base-url')?.value, 'OpenAI Base URL'));
+    $('#btn-copy-snippet')?.addEventListener('click', () => copyText($('#openai-code-pre')?.textContent, 'Code snippet'));
+    $('#btn-copy-cli-command')?.addEventListener('click', () => copyText($('#claude-code-cli-pre')?.textContent, 'CLI command'));
+
+    // Snippet tabs
+    $$('#code-snippet-tabs button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const snip = btn.getAttribute('data-snippet');
+        if (snip) renderSnippet(snip);
+      });
+    });
+
+    // Expose loader globally for safety
+    window.__loadApiKeysPage = loadApiKeysPage;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
      SECTION 27 — Boot Sequence
      ══════════════════════════════════════════════════════════════════ */
   async function init() {
@@ -5218,6 +7009,9 @@
     // Load providers on startup so topbar switcher is always populated
     loadProviders();
 
+    // Initialize API keys module event listeners
+    initApiKeysModule();
+
     if (initialView === 'overview') {
       await loadStats();
       renderSetupChecklist();
@@ -5239,7 +7033,7 @@
     if (initialView === 'diagnostics') resetDiagnostics();
     if (initialView === 'models') loadMappings();
     if (initialView === 'settings') { loadConfig(); loadOperations(); lciLoadStatus(); }
-
+    if (initialView === 'apikeys') loadApiKeysPage();
 
     const ivEl = $(`.view[data-view="${initialView}"]`);
     staggerView(ivEl);
@@ -5720,11 +7514,30 @@
 
     // Refresh overview panel every 15s alongside stats
     setInterval(loadContextOverview, 15_000);
+  })();
 
-    // Load context page if it is the initial view
-    const hash = location.hash.replace('#', '') || 'overview';
-    if (hash === 'context') {
-      setTimeout(loadContextPage, 100);
+  /* ── Dark Mode Toggle ────────────────────────────────────────── */
+  (function initTheme() {
+    const toggleBtn = document.getElementById('theme-toggle-btn');
+    if (!toggleBtn) return;
+    
+    const savedTheme = localStorage.getItem('fcc_theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
     }
-
+    
+    toggleBtn.addEventListener('click', () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('fcc_theme', 'light');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('fcc_theme', 'dark');
+      }
+    });
   })();

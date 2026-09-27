@@ -138,17 +138,37 @@ export interface AnthropicStreamMessageStart {
   };
 }
 
-export interface AnthropicStreamContentBlockStart {
+export interface AnthropicStreamContentBlockStartText {
   type: 'content_block_start';
   index: number;
   content_block: { type: 'text'; text: '' };
 }
 
-export interface AnthropicStreamContentBlockDelta {
+export interface AnthropicStreamContentBlockStartToolUse {
+  type: 'content_block_start';
+  index: number;
+  content_block: { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
+}
+
+export type AnthropicStreamContentBlockStart =
+  | AnthropicStreamContentBlockStartText
+  | AnthropicStreamContentBlockStartToolUse;
+
+export interface AnthropicStreamContentBlockDeltaText {
   type: 'content_block_delta';
   index: number;
   delta: { type: 'text_delta'; text: string };
 }
+
+export interface AnthropicStreamContentBlockDeltaToolUse {
+  type: 'content_block_delta';
+  index: number;
+  delta: { type: 'input_json_delta'; partial_json: string };
+}
+
+export type AnthropicStreamContentBlockDelta =
+  | AnthropicStreamContentBlockDeltaText
+  | AnthropicStreamContentBlockDeltaToolUse;
 
 export interface AnthropicStreamContentBlockStop {
   type: 'content_block_stop';

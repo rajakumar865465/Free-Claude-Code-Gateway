@@ -288,8 +288,9 @@ export class CompactionEngine {
       return messages;
     }
 
-    // Split: messages to summarize vs messages to keep
-    const cutoff = messages.length - keepRecent;
+    // Split: messages to summarize vs messages to keep safely
+    const initialCutoff = Math.max(0, messages.length - keepRecent);
+    const cutoff = this.findSafeCutoff(messages, initialCutoff);
     const toSummarize = messages.slice(0, cutoff);
     const toKeep = messages.slice(cutoff);
 
@@ -305,6 +306,35 @@ export class CompactionEngine {
 
     // Result: system messages + injection + recent messages
     return [...systemMessages, injectionMsg, ...toKeep];
+  }
+
+  /**
+   * Find a safe cutoff index so that assistant messages with tool_calls and
+   * their corresponding tool response messages are not severed across the
+   * compaction boundary.
+   */
+  private findSafeCutoff(messages: OpenAIMessage[], initialCutoff: number): number {
+    if (initialCutoff <= 0) return 0;
+    if (initialCutoff >= messages.length) return messages.length;
+
+    let cutoff = initialCutoff;
+
+    // If cutoff points to a tool message, walk backwards so we don't start toKeep
+    // with an orphan tool result.
+    while (cutoff > 0 && messages[cutoff].role === 'tool') {
+      cutoff--;
+    }
+
+    // If the message before cutoff was an assistant message that initiated tool_calls,
+    // we must include it in toKeep along with the tool messages.
+    if (cutoff > 0 && messages[cutoff - 1].role === 'assistant') {
+      const prev = messages[cutoff - 1] as { tool_calls?: unknown[] };
+      if (prev.tool_calls && prev.tool_calls.length > 0) {
+        cutoff--;
+      }
+    }
+
+    return Math.max(0, cutoff);
   }
 
   private buildSummaryMessage(
@@ -352,9 +382,11 @@ export class CompactionEngine {
     // Always keep system messages
     const systemMessages = messages.filter((m) => m.role === 'system');
 
-    // Keep only the last 5 messages as the active task context
+    // Keep only the last 5 messages as the active task context, respecting tool call boundaries
     const KEEP_LAST = 5;
-    const recentMessages = messages.slice(-KEEP_LAST).filter((m) => m.role !== 'system');
+    const initialCutoff = Math.max(0, messages.length - KEEP_LAST);
+    const cutoff = this.findSafeCutoff(messages, initialCutoff);
+    const recentMessages = messages.slice(cutoff).filter((m) => m.role !== 'system');
 
     // Build summary injection
     const injectionMsg = this.buildSummaryMessage(summary, projectState, messages.length - KEEP_LAST);

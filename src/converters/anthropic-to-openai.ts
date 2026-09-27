@@ -40,7 +40,7 @@ function joinTextBlocks(blocks: AnthropicContentBlock[]): string {
     if (block.type === 'text') {
       parts.push(block.text);
     } else if (block.type === 'image') {
-      parts.push('[Image input not supported by this proxy]');
+      parts.push('[Image omitted]');
     } else if (block.type === 'tool_use') {
       // tool_use in user/assistant message — skip; handled separately
     } else if (block.type === 'tool_result') {
@@ -73,13 +73,6 @@ export function convertAnthropicSystem(system: AnthropicSystemPrompt | undefined
 export function hasUnsupportedFeatures(
   content: AnthropicContent,
 ): { unsupported: true; reason: string } | { unsupported: false } {
-  if (typeof content === 'string') return { unsupported: false };
-  if (!Array.isArray(content)) return { unsupported: false };
-  for (const block of content) {
-    if (block && block.type === 'image') {
-      return { unsupported: true, reason: 'Image input is not supported in this proxy version.' };
-    }
-  }
   return { unsupported: false };
 }
 
@@ -132,6 +125,7 @@ function normalizeMessages(
   msgs: AnthropicMessage[],
 ): { ok: true; messages: OpenAIMessage[] } | { ok: false; status: number; message: string } {
   const out: OpenAIMessage[] = [];
+  const toolIdToName = new Map<string, string>();
 
   for (let i = 0; i < msgs.length; i++) {
     const msg = msgs[i];
@@ -139,20 +133,26 @@ function normalizeMessages(
       return { ok: false, status: 400, message: `messages[${i}] must be an object.` };
     }
     const role = msg.role;
-    if (role !== 'user' && role !== 'assistant') {
+    if (role !== 'user' && role !== 'assistant' && role !== 'system') {
       return { ok: false, status: 400, message: `Unsupported role "${String(role)}".` };
     }
     if (msg.content === undefined || msg.content === null) {
       return { ok: false, status: 400, message: 'message.content is required.' };
     }
 
-    if (typeof msg.content === 'string') {
-      out.push({ role, content: msg.content });
+    if (role === 'system' || typeof msg.content === 'string') {
+      let contentString = ' ';
+      if (typeof msg.content === 'string') {
+         contentString = msg.content || ' ';
+      } else if (Array.isArray(msg.content)) {
+         contentString = msg.content.map(b => (b as any).text || '').join('\n') || ' ';
+      }
+      out.push({ role, content: contentString });
       continue;
     }
 
     if (!Array.isArray(msg.content)) {
-      out.push({ role, content: '' });
+      out.push({ role, content: ' ' });
       continue;
     }
 
@@ -177,10 +177,11 @@ function normalizeMessages(
                 : JSON.stringify(block.input ?? {}),
             },
           });
+          toolIdToName.set(block.id, block.name);
         }
       }
 
-      const assistantMsg: OpenAIMessage = { role: 'assistant', content: textParts.join('\n') || null };
+      const assistantMsg: OpenAIMessage = { role: 'assistant', content: textParts.join('\n') || (toolCalls.length > 0 ? null : ' ') };
       if (toolCalls.length > 0) assistantMsg.tool_calls = toolCalls;
       out.push(assistantMsg);
 
@@ -200,22 +201,52 @@ function normalizeMessages(
           ? joinTextBlocks(block.content as AnthropicContentBlock[])
           : (block.content as string) ?? '';
 
-        out.push({
+        const toolName = toolIdToName.get(block.tool_use_id);
+        const toolMsg: OpenAIMessage = {
           role: 'tool',
           tool_call_id: block.tool_use_id,
-          content: resultText,
-        });
+          content: resultText || ' ',
+        };
+        if (toolName) {
+          toolMsg.name = toolName;
+        }
+        out.push(toolMsg);
       }
 
       // Regular user content after tool results
       if (otherBlocks.length > 0) {
-        const text = joinTextBlocks(otherBlocks);
-        if (text) out.push({ role: 'user', content: text });
+        const hasImages = otherBlocks.some((b) => b.type === 'image');
+        
+        if (hasImages) {
+          const contentParts: any[] = [];
+          for (const block of otherBlocks) {
+            if (block.type === 'text') {
+              contentParts.push({ type: 'text', text: block.text });
+            } else if (block.type === 'image') {
+              const img = block as any;
+              if (img.source?.type === 'base64') {
+                contentParts.push({
+                  type: 'image_url',
+                  image_url: { url: `data:${img.source.media_type};base64,${img.source.data}` },
+                });
+              } else if (img.source?.type === 'url') {
+                contentParts.push({
+                  type: 'image_url',
+                  image_url: { url: img.source.url },
+                });
+              }
+            }
+          }
+          out.push({ role: 'user', content: contentParts as any });
+        } else {
+          const text = joinTextBlocks(otherBlocks);
+          out.push({ role: 'user', content: text || ' ' });
+        }
       }
 
       // If the message had neither tool results nor other content, emit an empty user turn
       if (toolResults.length === 0 && otherBlocks.length === 0) {
-        out.push({ role: 'user', content: '' });
+        out.push({ role: 'user', content: ' ' });
       }
     }
   }
