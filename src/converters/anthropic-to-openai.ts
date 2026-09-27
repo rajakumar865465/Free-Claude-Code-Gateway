@@ -132,7 +132,7 @@ function normalizeMessages(
     if (!msg || typeof msg !== 'object') {
       return { ok: false, status: 400, message: `messages[${i}] must be an object.` };
     }
-    const role = msg.role;
+    const role = msg.role as string;
     if (role !== 'user' && role !== 'assistant' && role !== 'system') {
       return { ok: false, status: 400, message: `Unsupported role "${String(role)}".` };
     }
@@ -147,7 +147,7 @@ function normalizeMessages(
       } else if (Array.isArray(msg.content)) {
          contentString = msg.content.map(b => (b as any).text || '').join('\n') || ' ';
       }
-      out.push({ role, content: contentString });
+      out.push({ role: role as OpenAIMessage['role'], content: contentString });
       continue;
     }
 

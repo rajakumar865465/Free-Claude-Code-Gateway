@@ -245,9 +245,9 @@ describe('Gateway Audit Fixes Verification', () => {
       assert.equal(sonnet.display_name, 'Claude Sonnet 5');
       assert.ok(sonnet.created_at, 'Anthropic requires created_at');
 
-      const sonnet37 = responseBody.data.find((m: any) => m.id === 'claude-3-7-sonnet-20250219');
-      assert.ok(sonnet37, 'claude-3-7-sonnet-20250219 must be present');
-      assert.equal(sonnet37.display_name, 'Claude 3.7 Sonnet');
+      const opus55 = responseBody.data.find((m: any) => m.id === 'claude-opus-5-5');
+      assert.ok(opus55, 'claude-opus-5-5 must be present');
+      assert.equal(opus55.display_name, 'Claude Opus 5.5');
     });
 
     it('handles single model query /v1/models/:model_id', async () => {
@@ -332,7 +332,7 @@ describe('Gateway Audit Fixes Verification', () => {
       assert.equal(state.configManager.getDefaultModel(), 'z-ai/glm-5.3');
       assert.equal(state.modelRegistry.snapshot().default, 'z-ai/glm-5.3');
       assert.equal(state.modelRegistry.snapshot().mappings['claude-sonnet-5'], 'z-ai/glm-5.3');
-      assert.equal(state.modelRegistry.snapshot().mappings['claude-3-7-sonnet-20250219'], 'z-ai/glm-5.3');
+      assert.equal(state.modelRegistry.snapshot().mappings['claude-opus-5-5'], 'z-ai/glm-5.3');
 
       // Clean up test providers
       try {

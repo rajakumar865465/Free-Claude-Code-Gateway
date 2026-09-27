@@ -20,8 +20,8 @@ describe('model mapping', () => {
     process.env.MODELS_CONFIG_PATH = path.sep + 'definitely' + path.sep + 'missing' + path.sep + 'models.json';
     resetModelConfigCache();
     const cfg = loadModelConfig();
-    const resolved = resolveProviderModel('claude-opus-4-5-20251101', cfg, 'gpt-4.1', false);
-    assert.equal(resolved, cfg.anthropic_to_bluesminds['claude-opus-4-5-20251101']);
+    const resolved = resolveProviderModel('claude-opus-5-5', cfg, 'gpt-4.1', false);
+    assert.equal(resolved, cfg.anthropic_to_bluesminds['claude-opus-5-5']);
   });
 
   it('falls back to incoming model in non-strict mode when no family rules match', () => {
